@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block title %}Inventory{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Inventory Management</h2>
+    
+    <!-- Search and Filter Section -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="input-group">
+                <input type="text" class="form-control" id="inventorySearch" placeholder="Search inventory...">
+                <button class="btn btn-primary" type="button">Search</button>
+            </div>
+        </div>
+        <div class="col-md-6 text-end">
+            <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                <i class="fas fa-file-upload"></i> Upload Invoice/Table
+            </button>
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addItemModal">
+                <i class="fas fa-plus"></i> Add New Item
+            </button>
+        </div>
+    </div>
+
+    <!-- Inventory Table -->
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>Product Name</th>
+                    <th>Item Code</th>
+                    <th>Unit Size</th>
+                    <th>Unit Type</th>
+                    <th>Current Stock</th>
+                    <th>Reorder Level</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in inventory %}
+                <tr class="clickable-row" onclick="window.location='{{ url_for('inventory_item', item_code=item.item_code) }}'">
+                    <td>{{ item.product_name }}</td>
+                    <td>{{ item.item_code }}</td>
+                    <td>{{ item.unit_size }}</td>
+                    <td>{{ item.unit_type }}</td>
+                    <td>{{ item.current_stock }}</td>
+                    <td>{{ item.reorder_level }}</td>
+                    <td>
+                        {% if item.status == 'In Stock' %}
+                            <span class="badge bg-success">In Stock</span>
+                        {% elif item.status == 'Low Stock' %}
+                            <span class="badge bg-warning">Low Stock</span>
+                        {% else %}
+                            <span class="badge bg-danger">Critical</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add/Edit Item Modal -->
+<div class="modal fade" id="addItemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="mb-3">
+                        <label class="form-label">Product Name</label>
+                        <input type="text" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Item Code</label>
+                        <input type="text" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Unit Size</label>
+                        <input type="text" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Unit Type</label>
+                        <input type="text" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Current Stock</label>
+                        <input type="number" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reorder Level</label>
+                        <input type="number" class="form-control" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary">Save Item</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add this new modal before the existing addItemModal -->
+<div class="modal fade" id="uploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Upload Invoice/Table</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="uploadForm">
+                    <div class="mb-3">
+                        <label class="form-label">Upload File</label>
+                        <input type="file" class="form-control" id="fileInput" accept=".csv,.xlsx,.xls,.pdf" required>
+                        <small class="text-muted">Supported formats: CSV, Excel, PDF</small>
+                    </div>
+                    <div id="uploadStatus" class="alert d-none"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="uploadButton">Upload & Process</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+{{ super() }}
+<style>
+    .clickable-row {
+        cursor: pointer;
+    }
+    .clickable-row:hover {
+        background-color: rgba(0,0,0,0.05) !important;
+    }
+</style>
+<script>
+document.getElementById('uploadButton').addEventListener('click', async function() {
+    const fileInput = document.getElementById('fileInput');
+    const statusDiv = document.getElementById('uploadStatus');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        statusDiv.textContent = 'Please select a file first';
+        statusDiv.classList.remove('d-none', 'alert-success');
+        statusDiv.classList.add('alert-danger');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        statusDiv.textContent = 'Processing file...';
+        statusDiv.classList.remove('d-none', 'alert-danger');
+        statusDiv.classList.add('alert-info');
+
+        const response = await fetch('/inventory/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+            statusDiv.textContent = 'File processed successfully!';
+            statusDiv.classList.remove('alert-info', 'alert-danger');
+            statusDiv.classList.add('alert-success');
+            
+            // Update the inventory table with new items
+            if (result.items && result.items.length > 0) {
+                const tbody = document.querySelector('table tbody');
+                result.items.forEach(item => {
+                    // Create new row
+                    const tr = document.createElement('tr');
+                    tr.className = 'clickable-row';
+                    tr.onclick = () => window.location = `/inventory/item/${item.item_code}`;
+                    
+                    // Add status class based on stock levels
+                    const status = getItemStatus(item.current_stock, item.reorder_level);
+                    
+                    tr.innerHTML = `
+                        <td>${item.product_name}</td>
+                        <td>${item.item_code}</td>
+                        <td>${item.unit_size}</td>
+                        <td>${item.unit_type}</td>
+                        <td>${item.current_stock}</td>
+                        <td>${item.reorder_level}</td>
+                        <td>
+                            <span class="badge ${getBadgeClass(status)}">${status}</span>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+            
+            // Close the modal after 1 second
+            setTimeout(() => {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('uploadModal'));
+                modal.hide();
+            }, 1000);
+        } else {
+            throw new Error(result.message || 'Failed to process file');
+        }
+    } catch (error) {
+        statusDiv.textContent = `Error: ${error.message}`;
+        statusDiv.classList.remove('alert-info', 'alert-success');
+        statusDiv.classList.add('alert-danger');
+    }
+});
+
+// Helper function to determine item status
+function getItemStatus(currentStock, reorderLevel) {
+    if (currentStock <= 0) return 'Critical';
+    if (currentStock <= reorderLevel) return 'Low Stock';
+    return 'In Stock';
+}
+
+// Helper function to get badge class
+function getBadgeClass(status) {
+    switch (status) {
+        case 'In Stock': return 'bg-success';
+        case 'Low Stock': return 'bg-warning';
+        case 'Critical': return 'bg-danger';
+        default: return 'bg-secondary';
+    }
+}
+</script>
+{% endblock %}
+{% endblock %} 

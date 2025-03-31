@@ -1,0 +1,512 @@
+{% extends "base.html" %}
+
+{% block title %}{{ item.product_name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="mb-4">
+        <a href="{{ url_for('inventory') }}" class="btn btn-outline-secondary rounded-pill">
+            <i class="fas fa-arrow-left"></i> Back to Inventory
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <h3 class="mb-4">3 Gallon Sharps Container with Lid</h3>
+            
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-between border-bottom py-2 mb-2">
+                                <strong>Last Purchase Price</strong>
+                                <span>$16.75</span>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2 mb-2">
+                                <strong>Current Price</strong>
+                                <span>$17.50</span>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2 mb-2">
+                                <strong>Vendor</strong>
+                                <span>MedSource Solutions</span>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2 mb-2">
+                                <strong>Unit Cost</strong>
+                                <span>$16.75</span>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2 mb-2">
+                                <strong>Manufacturer ID</strong>
+                                <span>5508</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-between border-bottom py-2 mb-2">
+                                <strong>Inventory</strong>
+                                <span>45 units</span>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2 mb-2">
+                                <strong>Required Units</strong>
+                                <span>120</span>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2 mb-2">
+                                <strong>Manufacturer</strong>
+                                <span>Sharps Technology, Inc</span>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2 mb-2">
+                                <strong>Packaging</strong>
+                                <span>10bx/cs</span>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2 mb-2">
+                                <strong>Unit of Measure</strong>
+                                <span>case</span>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2 mb-2">
+                                <strong>Specifications</strong>
+                                <span>
+                                    Capacity: 3 Gallon<br>
+                                    Material: Medical-grade Plastic
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <img src="https://imgcdn.mckesson.com/CumulusWeb/Images/High_Res/365061_ppkgright.jpg" 
+                         alt="3 Gallon Sharps Container" 
+                         class="img-fluid">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="mb-0">Alternative Products</h4>
+            <button class="btn btn-primary" onclick="findAlternatives('3 Gallon Sharps Container with Lid')">
+                <i class="fas fa-search"></i> Find Alternatives
+            </button>
+        </div>
+
+        <div id="alternativeProductsContainer">
+            <!-- Default visible product card -->
+            <div class="card mb-4 product-card">
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <div class="agent-comment bg-light p-3 rounded">
+                                <strong>Agent Comment</strong>
+                                <p class="mb-0 agent-comment-text">Let's search for alternative vendors to potentially save on costs and compare market prices.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="text-muted">Price Per Unit</label>
+                                <h5 class="price-value">--</h5>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="text-muted">Savings</label>
+                                <h5 class="savings-value">--</h5>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="text-muted">Vendor</label>
+                                <h5 class="vendor-value">--</h5>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="text-muted">Manufacturer</label>
+                                <h5 class="manufacturer-value">--</h5>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="text-muted">Shipping</label>
+                                <h5 class="shipping-value">--</h5>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="text-muted">Denomination</label>
+                                <h5 class="denomination-value">--</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hidden template for additional results -->
+            <div class="card mb-4 product-card template" style="display: none;">
+                <!-- Same structure as above, but hidden -->
+                <!-- This will be used as a template for search results -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Search components -->
+    <div id="searchComponents" style="display: none;" class="mt-4">
+        <!-- Progress Updates -->
+        <div id="progressContainer" class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Search Progress</h5>
+            </div>
+            <div class="card-body">
+                <div id="progressUpdates" class="bg-light p-3 rounded" style="max-height: 300px; overflow-y: auto;">
+                    <div class="progress">
+                        <div id="searchProgress" class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <div id="progressText" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Planned Websites -->
+        <div id="plannedWebsites" class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Planned Search Websites</h5>
+            </div>
+            <div class="card-body">
+                <form id="websiteSelectionForm" class="website-selection">
+                    <div class="mb-3" id="websiteCheckboxes"></div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-play"></i> Run Search
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Search Results -->
+        <div id="searchResults" class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Search Results</h5>
+            </div>
+            <div class="card-body">
+                <div id="searchSummary" class="alert alert-info"></div>
+                <div class="table-responsive">
+                    <table class="table table-striped" id="resultsTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Price</th>
+                                <th>Website</th>
+                                <th>Compliance</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Item Modal -->
+<div class="modal fade" id="editItemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editItemForm">
+                    <div class="mb-3">
+                        <label class="form-label">Product Name</label>
+                        <input type="text" class="form-control" name="product_name" value="{{ item.product_name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Unit Size</label>
+                        <input type="text" class="form-control" name="unit_size" value="{{ item.unit_size }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Unit Type</label>
+                        <input type="text" class="form-control" name="unit_type" value="{{ item.unit_type }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Current Stock</label>
+                        <input type="number" class="form-control" name="current_stock" value="{{ item.current_stock }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Reorder Level</label>
+                        <input type="number" class="form-control" name="reorder_level" value="{{ item.reorder_level }}" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="updateItem('{{ item.item_code }}')">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Compliance Details Modal -->
+<div class="modal fade" id="complianceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Compliance Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="complianceDetails"></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+{{ super() }}
+<script>
+function updateItem(itemCode) {
+    const formData = new FormData(document.getElementById('editItemForm'));
+    const data = Object.fromEntries(formData.entries());
+    
+    fetch(`/inventory/update/${itemCode}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error updating item: ' + data.message);
+        }
+    });
+}
+
+function deleteItem(itemCode) {
+    if (confirm('Are you sure you want to delete this item?')) {
+        fetch(`/inventory/delete/${itemCode}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = "{{ url_for('inventory') }}";
+            } else {
+                alert('Error deleting item: ' + data.message);
+            }
+        });
+    }
+}
+
+async function findAlternatives(productName) {
+    const searchComponents = document.getElementById('searchComponents');
+    const plannedWebsites = document.getElementById('plannedWebsites');
+    const websiteCheckboxes = document.getElementById('websiteCheckboxes');
+    
+    try {
+        const response = await fetch("{{ url_for('plan_search') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query: productName })
+        });
+        
+        const data = await response.json();
+        
+        if (data.websites) {
+            websiteCheckboxes.innerHTML = data.websites.map((website, index) => `
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" name="websites" value="${website}" id="website-${index}" checked>
+                    <label class="form-check-label" for="website-${index}">${website}</label>
+                </div>
+            `).join('');
+            
+            searchComponents.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error planning search');
+    }
+}
+
+async function runSearch(query, websites) {
+    const progressContainer = document.getElementById('progressContainer');
+    const progressText = document.getElementById('progressText');
+    const searchProgress = document.getElementById('searchProgress');
+    
+    progressContainer.style.display = 'block';
+    progressText.innerHTML = '';
+    searchProgress.style.width = '0%';
+    
+    try {
+        progressText.innerHTML += '<p>Planning search strategy...</p>';
+        searchProgress.style.width = '20%';
+        
+        const response = await fetch("{{ url_for('run_search') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query, websites })
+        });
+
+        progressText.innerHTML += '<p>Searching websites...</p>';
+        searchProgress.style.width = '60%';
+        
+        const data = await response.json();
+        
+        if (!data.products) {
+            data = {
+                products: [],
+                compliance_results: []
+            };
+        }
+
+        // Ensure data.products is always an array
+        if (!Array.isArray(data.products)) {
+            data.products = [];
+        }
+        
+        progressText.innerHTML += '<p>Processing results...</p>';
+        searchProgress.style.width = '100%';
+        
+        displaySearchResults(data);
+    } catch (error) {
+        console.error('Error:', error);
+        progressText.innerHTML += `<p class="text-danger">Error: ${error.message}</p>`;
+    }
+}
+
+function showComplianceDetails(explanation) {
+    document.getElementById('complianceDetails').textContent = explanation;
+    new bootstrap.Modal(document.getElementById('complianceModal')).show();
+}
+
+function displaySearchResults(results) {
+    const alternativeProductsContainer = document.getElementById('alternativeProductsContainer');
+    
+    // Clear existing product cards except the first one (which serves as our template)
+    const existingCards = alternativeProductsContainer.querySelectorAll('.product-card:not(:first-child)');
+    existingCards.forEach(card => card.remove());
+    
+    // Get the template card (first product card)
+    const templateCard = alternativeProductsContainer.querySelector('.product-card');
+    
+    // Clear existing table rows
+    const resultsTable = document.querySelector('#resultsTable tbody');
+    resultsTable.innerHTML = '';
+    
+    results.products.forEach((product, index) => {
+        // Clone the template
+        const productCard = templateCard.cloneNode(true);
+        
+        // Update agent comment if available
+        const agentCommentText = productCard.querySelector('.agent-comment-text');
+        if (agentCommentText) {
+            agentCommentText.textContent = product.comment || 'Alternative product found based on your search criteria.';
+        }
+        
+        // Update values - using optional chaining to prevent null errors
+        const priceValue = productCard.querySelector('.price-value');
+        if (priceValue) priceValue.textContent = product.price || '--';
+        
+        const vendorValue = productCard.querySelector('.vendor-value');
+        if (vendorValue) vendorValue.textContent = product.website || '--';
+        
+        const manufacturerValue = productCard.querySelector('.manufacturer-value');
+        if (manufacturerValue) manufacturerValue.textContent = product.manufacturer || '--';
+        
+        // Calculate and display savings if possible
+        const savingsValue = productCard.querySelector('.savings-value');
+        if (savingsValue) {
+            const savings = calculateSavings(product.price);
+            savingsValue.textContent = savings || '--';
+        }
+        
+        const shippingValue = productCard.querySelector('.shipping-value');
+        if (shippingValue) shippingValue.textContent = product.shipping || '--';
+        
+        const denominationValue = productCard.querySelector('.denomination-value');
+        if (denominationValue) denominationValue.textContent = product.denomination || '--';
+        
+        // Make sure the card is visible
+        productCard.style.display = 'block';
+
+        // Add the card to the container
+        alternativeProductsContainer.appendChild(productCard);
+
+        
+        // Update the table row creation with correct compliance logic
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${product.name || '--'}</td>
+            <td>${product.price || '--'}</td>
+            <td>${product.website || '--'}</td>
+            <td>
+                <span class="badge ${product.compliance === '✅ Compliant' ? 'bg-success' : 'bg-danger'}">
+                    ${product.compliance === '✅ Compliant' ? '✓ Compliant' : '❌ Non-compliant'}
+                </span>
+                <button class="btn btn-sm btn-link" onclick="showComplianceDetails('${(product.explanation || 'No compliance information available').replace(/'/g, "&apos;")}')">
+                    <i class="fas fa-info-circle"></i>
+                </button>
+            </td>
+            <td>
+                ${product.url ? `
+                    <a href="${product.url}" target="_blank" class="btn btn-sm btn-primary">
+                        <i class="fas fa-external-link-alt"></i> View
+                    </a>
+                ` : '--'}
+            </td>
+        `;
+        resultsTable.appendChild(row);
+    });
+    
+    // Hide the template card if no results
+    if (results.products.length === 0) {
+        templateCard.style.display = 'none';
+    }
+}
+
+function calculateSavings(newPrice) {
+    if (!newPrice) return '--';
+    
+    // Get the current price from the page
+    const currentPriceElement = document.querySelector('.border-bottom:nth-child(2) span');
+    if (!currentPriceElement) return '--';
+    
+    const currentPrice = parseFloat(currentPriceElement.textContent.replace(/[^0-9.]/g, ''));
+    const newPriceValue = parseFloat(newPrice.replace(/[^0-9.]/g, ''));
+    
+    if (isNaN(currentPrice) || isNaN(newPriceValue)) return '--';
+    
+    const savings = ((currentPrice - newPriceValue) / currentPrice * 100).toFixed(1);
+    return savings > 0 ? `Save ${savings}%` : '--';
+}
+
+// Add websiteSelectionForm submit handler
+document.getElementById('websiteSelectionForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const websites = Array.from(this.querySelectorAll('input[name="websites"]:checked'))
+        .map(cb => cb.value);
+    const productName = document.querySelector('h3').textContent.trim();
+    
+    if (websites.length === 0) {
+        alert('Please select at least one website to search');
+        return;
+    }
+    
+    await runSearch(productName, websites);
+});
+</script>
+{% endblock %}
+{% endblock %} 

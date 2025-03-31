@@ -1,0 +1,15 @@
+rich>=10.0.0
+# ... your other dependencies ... 
+fastapi>=0.100.0  # Updated to version that supports pydantic v2
+uvicorn>=0.15.0
+pandas
+openpyxl  # for Excel support
+PyPDF2    # for PDF support
+pydantic>=2.10,<3  # For openai-agents compatibility
+openai-agents==0.0.3
+openai>=1.0.0  # Added explicit openai requirement
+python-multipart  # For handling file uploads 
+selenium==4.18.1
+webdriver-manager==4.0.1
+beautifulsoup4==4.12.3
+requests==2.31.0 

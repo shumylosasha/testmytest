@@ -1,0 +1,495 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{% if order %}Order #{{ order.id }}{% else %}New Order{% endif %}</h2>
+        <a href="{{ url_for('orders') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Orders
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-bordered" id="orderItemsTable">
+            <thead>
+                <tr>
+                    <th>Product Name</th>
+                    <th>Manufacturer ID</th>
+                    <th>Packaging</th>
+                    <th>Unit of Measure</th>
+                    <th>Quantity</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if order %}
+                    {% for item in order.items %}
+                    <tr>
+                        <td>{{ item.product_name }}</td>
+                        <td>{{ item.manufacturer_id }}</td>
+                        <td>{{ item.packaging }}</td>
+                        <td>{{ item.unit_of_measure }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-danger remove-row">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% endif %}
+                <tr id="newRow">
+                    <td><input type="text" class="form-control" name="product_name"></td>
+                    <td><input type="text" class="form-control" name="manufacturer_id"></td>
+                    <td><input type="text" class="form-control" name="packaging"></td>
+                    <td><input type="text" class="form-control" name="unit_of_measure"></td>
+                    <td><input type="number" class="form-control" name="quantity" min="1"></td>
+                    <td>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-success" id="addRow">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Add search components -->
+    <div id="searchComponents" style="display: none;">
+        <!-- Progress Updates -->
+        <div id="progressContainer" class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Search Progress</h5>
+            </div>
+            <div class="card-body">
+                <div id="progressUpdates" class="bg-light p-3 rounded" style="max-height: 300px; overflow-y: auto;"></div>
+            </div>
+        </div>
+
+        <!-- Planned Websites -->
+        <div id="plannedWebsites" class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Planned Search Websites</h5>
+            </div>
+            <div class="card-body">
+                <form id="websiteSelectionForm" class="website-selection">
+                    <div class="mb-3" id="websiteCheckboxes"></div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-play"></i> Run Search
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Search Results -->
+        <div id="searchResults" class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Search Results</h5>
+            </div>
+            <div class="card-body">
+                <div id="searchSummary" class="alert alert-info"></div>
+                <div class="table-responsive">
+                    <table class="table table-striped" id="resultsTable">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" id="selectAllProducts"></th>
+                                <th>Name</th>
+                                <th>Manufacturer ID</th>
+                                <th>MPN</th>
+                                <th>Packaging</th>
+                                <th>Unit of Measure</th>
+                                <th>Price</th>
+                                <th>Website</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add this after the search results table in the searchResults div -->
+    <div id="rfqActions" class="mt-4" style="display: none;">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5>Selected Products for RFQ</h5>
+            <button class="btn btn-primary" id="generateRfqBtn">
+                <i class="fas fa-file-alt"></i> Generate RFQ
+            </button>
+        </div>
+        <div id="selectedProducts" class="mt-3">
+            <!-- Selected products will be listed here -->
+        </div>
+    </div>
+
+    <!-- Add RFQ Modal -->
+    <div class="modal fade" id="rfqModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Request for Quotation</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Vendor Emails (comma-separated)</label>
+                        <input type="text" class="form-control" id="vendorEmails" placeholder="vendor1@example.com, vendor2@example.com">
+                    </div>
+                    <div id="rfqPreview" class="border p-3 rounded">
+                        <!-- RFQ content will be inserted here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="sendRfqBtn">
+                        <i class="fas fa-paper-plane"></i> Send RFQ
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4 text-end">
+        <button type="button" class="btn btn-primary" id="planSearchBtn" disabled>
+            <i class="fas fa-search"></i> Plan Search
+        </button>
+    </div>
+</div>
+
+<script>
+document.getElementById('addRow').addEventListener('click', function() {
+    const newRow = document.getElementById('newRow');
+    const clone = newRow.cloneNode(true);
+    clone.removeAttribute('id');
+    
+    // Change to just a remove button
+    const lastCell = clone.cells[clone.cells.length - 1];
+    lastCell.innerHTML = `
+        <div class="btn-group">
+            <button class="btn btn-sm btn-danger remove-row">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `;
+    
+    // Clear the input values
+    clone.querySelectorAll('input').forEach(input => {
+        input.value = '';
+    });
+    
+    // Insert the clone before the new row
+    newRow.parentNode.insertBefore(clone, newRow);
+});
+
+// Add click handler for row selection
+document.getElementById('orderItemsTable').addEventListener('click', function(e) {
+    if (e.target.closest('.remove-row')) {
+        e.target.closest('tr').remove();
+    } else {
+        // Handle row selection
+        const row = e.target.closest('tr');
+        if (row && row.id !== 'newRow') {
+            // Remove selection from other rows
+            document.querySelectorAll('#orderItemsTable tbody tr').forEach(tr => {
+                tr.classList.remove('table-active');
+            });
+            
+            // Add selection to clicked row
+            row.classList.add('table-active');
+            
+            // Enable plan search button
+            const planSearchBtn = document.getElementById('planSearchBtn');
+            planSearchBtn.disabled = false;
+            
+            // Store the product name for the selected row
+            const productName = row.querySelector('[name="product_name"]')?.value || 
+                              row.cells[0].textContent.trim();
+            planSearchBtn.dataset.product = productName;
+        }
+    }
+});
+
+// Add plan search button handler
+document.getElementById('planSearchBtn').addEventListener('click', async function() {
+    const productName = this.dataset.product;
+    if (!productName) {
+        alert('Please select a product first');
+        return;
+    }
+    await planSearch(productName);
+});
+
+// Add some CSS for selected row
+const style = document.createElement('style');
+style.textContent = `
+    .table-active {
+        background-color: rgba(0, 123, 255, 0.1) !important;
+    }
+`;
+document.head.appendChild(style);
+
+async function planSearch(productName) {
+    const searchComponents = document.getElementById('searchComponents');
+    const plannedWebsites = document.getElementById('plannedWebsites');
+    const websiteCheckboxes = document.getElementById('websiteCheckboxes');
+    
+    try {
+        const response = await fetch("{{ url_for('plan_search') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query: productName })
+        });
+        
+        const data = await response.json();
+        
+        if (data.websites) {
+            websiteCheckboxes.innerHTML = data.websites.map((website, index) => `
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" name="websites" value="${website}" id="website-${index}" checked>
+                    <label class="form-check-label" for="website-${index}">${website}</label>
+                </div>
+            `).join('');
+            
+            searchComponents.style.display = 'block';
+            document.getElementById('searchResults').style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error planning search');
+    }
+}
+
+async function runSearch(query, websites) {
+    const progressContainer = document.getElementById('progressContainer');
+    const progressUpdates = document.getElementById('progressUpdates');
+    const searchResults = document.getElementById('searchResults');
+    
+    progressContainer.style.display = 'block';
+    progressUpdates.innerHTML = '';
+    
+    try {
+        const response = await fetch("{{ url_for('run_search') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query, websites })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const {value, done} = await reader.read();
+            if (done) break;
+            
+            const text = decoder.decode(value);
+            if (text.startsWith('{')) {
+                // This is the final results JSON
+                const results = JSON.parse(text);
+                displaySearchResults(results);
+            } else {
+                // This is a progress update
+                const update = document.createElement('p');
+                update.textContent = text;
+                update.className = 'mb-2';
+                progressUpdates.appendChild(update);
+                progressUpdates.scrollTop = progressUpdates.scrollHeight;
+            }
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        progressUpdates.innerHTML += `<p class="text-danger mb-2">Error: ${error.message}</p>`;
+    }
+}
+
+function displaySearchResults(results) {
+    const searchResults = document.getElementById('searchResults');
+    const searchSummary = document.getElementById('searchSummary');
+    const resultsTableBody = document.querySelector('#resultsTable tbody');
+    const rfqActions = document.getElementById('rfqActions');
+    
+    searchSummary.innerHTML = `
+        <p class="mb-1">${results.summary}</p>
+        <p class="mb-1">Found ${results.total_products} unique products</p>
+        <p class="mb-0">Price range: ${results.price_range}</p>
+    `;
+    
+    resultsTableBody.innerHTML = results.products.map((product, index) => {
+        const compliance = results.compliance_results[index];
+        const complianceStatus = compliance ? 
+            (compliance.compliant ? '✅ Compliant' : '❌ Non-compliant') : 
+            '⚪ Not checked';
+            
+        return `
+        <tr>
+            <td><input type="checkbox" class="product-select" data-product='${JSON.stringify(product)}'></td>
+            <td>${product.name}</td>
+            <td>${product.manufacturer_id}</td>
+            <td>${product.mpn}</td>
+            <td>${product.packaging}</td>
+            <td>${product.unit_of_measure}</td>
+            <td>${product.price}</td>
+            <td>${product.website}</td>
+            <td>
+                <div class="btn-group">
+                    ${product.url ? `
+                        <a href="${product.url}" class="btn btn-sm btn-info" target="_blank">
+                            <i class="fas fa-external-link-alt"></i> View
+                        </a>
+                    ` : ''}
+                </div>
+                <div class="mt-2">
+                    <span class="badge ${compliance?.compliant ? 'bg-success' : 'bg-danger'}">
+                        ${complianceStatus}
+                    </span>
+                    ${compliance ? `
+                        <div class="small mt-1">
+                            ${compliance.explanation}
+                        </div>
+                    ` : ''}
+                </div>
+            </td>
+        </tr>
+    `}).join('');
+    
+    searchResults.style.display = 'block';
+    rfqActions.style.display = 'block';
+    
+    // Add event listeners for RFQ functionality
+    setupRfqHandlers();
+}
+
+function setupRfqHandlers() {
+    const selectAllCheckbox = document.getElementById('selectAllProducts');
+    const productCheckboxes = document.querySelectorAll('.product-select');
+    const generateRfqBtn = document.getElementById('generateRfqBtn');
+    const sendRfqBtn = document.getElementById('sendRfqBtn');
+    
+    selectAllCheckbox.addEventListener('change', function() {
+        productCheckboxes.forEach(cb => cb.checked = this.checked);
+        updateSelectedProducts();
+    });
+    
+    productCheckboxes.forEach(cb => {
+        cb.addEventListener('change', updateSelectedProducts);
+    });
+    
+    generateRfqBtn.addEventListener('click', generateRfq);
+    sendRfqBtn.addEventListener('click', sendRfq);
+}
+
+function updateSelectedProducts() {
+    const selectedProducts = document.querySelectorAll('.product-select:checked');
+    const selectedProductsDiv = document.getElementById('selectedProducts');
+    
+    selectedProductsDiv.innerHTML = Array.from(selectedProducts).map(cb => {
+        const product = JSON.parse(cb.dataset.product);
+        return `
+            <div class="card mb-2">
+                <div class="card-body py-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${product.name}</strong>
+                            <br>
+                            <small class="text-muted">
+                                ${product.manufacturer_id} | ${product.price}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function generateRfq() {
+    const selectedProducts = document.querySelectorAll('.product-select:checked');
+    const products = Array.from(selectedProducts).map(cb => JSON.parse(cb.dataset.product));
+    
+    const rfqContent = `
+        <div class="rfq-document">
+            <h4>Request for Quotation (RFQ)</h4>
+            <p>Date: ${new Date().toLocaleDateString()}</p>
+            <p>RFQ Reference: RFQ-${Date.now()}</p>
+            
+            <h5 class="mt-4">Items Required:</h5>
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Item Description</th>
+                        <th>Manufacturer ID</th>
+                        <th>Quantity</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${products.map((product, index) => `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${product.name}</td>
+                            <td>${product.manufacturer_id}</td>
+                            <td><input type="number" class="form-control form-control-sm" value="1"></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            
+            <h5 class="mt-4">Terms & Conditions:</h5>
+            <ul>
+                <li>Product must be HIPPA, ISO, GMP Compliant</li>
+                <li>Payment terms will be NET 60</li>
+                <li>All prices must be valid for 30 calendar days from the date of quotation</li>
+            </ul>
+        </div>
+    `;
+    
+    document.getElementById('rfqPreview').innerHTML = rfqContent;
+    new bootstrap.Modal(document.getElementById('rfqModal')).show();
+}
+
+async function sendRfq() {
+    const vendorEmails = document.getElementById('vendorEmails').value;
+    const rfqContent = document.getElementById('rfqPreview').innerHTML;
+    
+    try {
+        const response = await fetch('/send_rfq', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                emails: vendorEmails.split(',').map(e => e.trim()),
+                content: rfqContent
+            })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            alert('RFQ sent successfully!');
+            bootstrap.Modal.getInstance(document.getElementById('rfqModal')).hide();
+        } else {
+            alert('Error sending RFQ: ' + result.message);
+        }
+    } catch (error) {
+        alert('Error sending RFQ: ' + error.message);
+    }
+}
+
+// Update the websiteSelectionForm submit handler
+document.getElementById('websiteSelectionForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const websites = Array.from(this.querySelectorAll('input[name="websites"]:checked'))
+        .map(cb => cb.value);
+    const productName = document.getElementById('planSearchBtn').dataset.product;
+    await runSearch(productName, websites);
+});
+</script>
+{% endblock %} 

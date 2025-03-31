@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Procurement{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Procurement</h2>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="POST" id="searchForm">
+                <div class="input-group">
+                    <input 
+                        type="text" 
+                        name="query" 
+                        class="form-control"
+                        placeholder="Enter your search query..."
+                        required
+                    >
+                    <button type="submit" name="action" value="plan" class="btn btn-primary">
+                        <i class="fas fa-search"></i> Plan Search
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Progress Updates -->
+    <div id="progressContainer" style="display: none;" class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Search Progress</h5>
+        </div>
+        <div class="card-body">
+            <div id="progressUpdates" class="bg-light p-3 rounded" style="max-height: 300px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    {% if planned_websites %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Search Strategy</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" class="website-selection">
+                <input type="hidden" name="query" value="{{ query }}">
+                
+                <div class="mb-4">
+                    <h6>1. Check Existing Vendors</h6>
+                    <div class="mb-3">
+                        {% for website in planned_websites %}
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" name="websites" value="{{ website }}" id="website-{{ loop.index }}" checked>
+                            <label class="form-check-label" for="website-{{ loop.index }}">{{ website }}</label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <h6>2. Suggest Alternatives</h6>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="find_alternatives" id="find-alternatives" checked>
+                        <label class="form-check-label" for="find-alternatives">
+                            Search for alternative products and suppliers
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <h6>3. Check for Compliance</h6>
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="check_compliance" id="check-compliance" checked>
+                        <label class="form-check-label" for="check-compliance">
+                            Verify compliance with regulations and standards
+                        </label>
+                    </div>
+                </div>
+
+                <button type="submit" name="action" value="search" class="btn btn-primary">
+                    <i class="fas fa-play"></i> Run Search
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if results %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Search Results</h5>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <p class="mb-1">{{ results.summary }}</p>
+                <p class="mb-1">Found {{ results.total_products }} unique products</p>
+                <p class="mb-0">Price range: {{ results.price_range }}</p>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Manufacturer ID</th>
+                            <th>MPN</th>
+                            <th>Packaging</th>
+                            <th>Unit of Measure</th>
+                            <th>Price</th>
+                            <th>Website</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in results.products %}
+                        <tr>
+                            <td>{{ product.name }}</td>
+                            <td>{{ product.manufacturer_id }}</td>
+                            <td>{{ product.mpn }}</td>
+                            <td>{{ product.packaging }}</td>
+                            <td>{{ product.unit_of_measure }}</td>
+                            <td>{{ product.price }}</td>
+                            <td>{{ product.website }}</td>
+                            <td>
+                                <div class="btn-group">
+                                    {% if product.url %}
+                                    <a href="{{ product.url }}" class="btn btn-sm btn-info" target="_blank">
+                                        <i class="fas fa-external-link-alt"></i> View
+                                    </a>
+                                    {% endif %}
+                                    <button 
+                                        onclick="checkCompliance('{{ product.name }}', '{{ product.price }}', '{{ product.website }}')"
+                                        class="btn btn-sm btn-secondary">
+                                        <i class="fas fa-check-circle"></i> Check Compliance
+                                    </button>
+                                </div>
+                                <div id="compliance-result-{{ loop.index0 }}" class="mt-2 small"></div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+async function runSearch(query, websites) {
+    const progressContainer = document.getElementById('progressContainer');
+    const progressUpdates = document.getElementById('progressUpdates');
+    progressContainer.style.display = 'block';
+    
+    try {
+        const response = await fetch('/run_search', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query, websites })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const {value, done} = await reader.read();
+            if (done) break;
+            
+            const text = decoder.decode(value);
+            const update = document.createElement('p');
+            update.textContent = text;
+            update.className = 'mb-2';
+            progressUpdates.appendChild(update);
+            progressUpdates.scrollTop = progressUpdates.scrollHeight;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        progressUpdates.innerHTML += `<p class="text-danger mb-2">Error: ${error.message}</p>`;
+    }
+}
+
+document.getElementById('searchForm').onsubmit = async (e) => {
+    if (e.submitter.value === 'search') {
+        e.preventDefault();
+        const query = document.querySelector('input[name="query"]').value;
+        const websites = Array.from(document.querySelectorAll('input[name="websites"]:checked'))
+            .map(cb => cb.value);
+        await runSearch(query, websites);
+    }
+};
+
+async function checkCompliance(name, price, website) {
+    const productIndex = event.target.closest('tr').rowIndex - 1;
+    const resultDiv = document.getElementById(`compliance-result-${productIndex}`);
+    const button = event.target;
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking...';
+    resultDiv.textContent = '';
+    
+    try {
+        const response = await fetch('/check_compliance', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                product: {
+                    name: name,
+                    price: price,
+                    website: website
+                }
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.compliance_check || 'Failed to check compliance');
+        }
+        
+        resultDiv.textContent = result.compliance_check;
+        resultDiv.className = 'mt-2 small ' + 
+            (result.compliance_check.toLowerCase().includes('yes') ? 'text-success' : 'text-danger');
+    } catch (error) {
+        console.error('Error:', error);
+        resultDiv.textContent = error.message || 'Error checking compliance';
+        resultDiv.className = 'mt-2 small text-danger';
+    } finally {
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-check-circle"></i> Check Compliance';
+    }
+}
+</script>
+{% endblock %} 
