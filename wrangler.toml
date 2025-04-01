@@ -1,0 +1,13 @@
+[build]
+command = "pnpm run build"
+cwd = "."
+
+[site]
+bucket = ".next"
+
+[build.upload]
+format = "service-worker"
+
+[env.production]
+name = "healthcare-procurement"
+route = ""  # Add your custom domain here if you have one 

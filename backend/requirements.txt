@@ -12,4 +12,8 @@ python-multipart  # For handling file uploads
 selenium==4.18.1
 webdriver-manager==4.0.1
 beautifulsoup4==4.12.3
-requests==2.31.0 
+requests==2.31.0
+flask>=3.0.0  # Added Flask with latest stable version
+flask-cors>=4.0.0  # Added for CORS support
+python-dotenv>=1.0.0  # Added for environment variable management
+typing-extensions>=4.8.0  # Added for enhanced typing support 
