@@ -1,13 +1,20 @@
 [build]
 command = "pnpm run build"
-cwd = "."
 
 [site]
-bucket = ".next"
+bucket = ".next/static"
+entry-point = "workers-site/index.js"
 
 [build.upload]
 format = "service-worker"
 
 [env.production]
 name = "healthcare-procurement"
-route = ""  # Add your custom domain here if you have one 
+workers_dev = true
+route = ""  # Add your custom domain here if you have one
+
+[env.production.vars]
+NEXT_PUBLIC_API_URL = "https://your-backend-api-url.com/api"
+
+[build.environment]
+NODE_VERSION = "20" 

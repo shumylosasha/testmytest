@@ -1,7 +1,8 @@
 rich>=10.0.0
 # ... your other dependencies ... 
 fastapi>=0.100.0  # Updated to version that supports pydantic v2
-uvicorn>=0.15.0
+uvicorn[standard]>=0.15.0
+gunicorn>=21.2.0
 pandas
 openpyxl  # for Excel support
 PyPDF2    # for PDF support
