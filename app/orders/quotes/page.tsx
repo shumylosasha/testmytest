@@ -7,8 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ChevronLeft, FileUp, Search, Filter, Check, X, Clock, TrendingDown } from "lucide-react"
+import { ChevronLeft, FileUp, Search, Filter, Check, X, Clock, TrendingDown, CheckCircle2, XCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { ArrowUpDown } from "lucide-react"
 
 // Mock data for quotes
 const quotesData = [
@@ -108,10 +109,46 @@ const quoteComparisonData = {
   ],
 }
 
+// Mock data for demonstration
+const mockQuotes = [
+  {
+    vendor: "Medical Supplies Co.",
+    totalAmount: 12500,
+    deliveryTime: "3-5 days",
+    items: [
+      { name: "Surgical Masks", quantity: 1000, price: 2.5, total: 2500 },
+      { name: "Hand Sanitizer", quantity: 500, price: 3.0, total: 1500 },
+      { name: "Gloves", quantity: 2000, price: 4.25, total: 8500 },
+    ],
+  },
+  {
+    vendor: "Healthcare Solutions",
+    totalAmount: 11800,
+    deliveryTime: "2-4 days",
+    items: [
+      { name: "Surgical Masks", quantity: 1000, price: 2.3, total: 2300 },
+      { name: "Hand Sanitizer", quantity: 500, price: 2.8, total: 1400 },
+      { name: "Gloves", quantity: 2000, price: 4.05, total: 8100 },
+    ],
+  },
+  {
+    vendor: "Global Medical",
+    totalAmount: 13200,
+    deliveryTime: "4-6 days",
+    items: [
+      { name: "Surgical Masks", quantity: 1000, price: 2.7, total: 2700 },
+      { name: "Hand Sanitizer", quantity: 500, price: 3.2, total: 1600 },
+      { name: "Gloves", quantity: 2000, price: 4.45, total: 8900 },
+    ],
+  },
+]
+
 export default function QuotesPage() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("all")
+  const [selectedVendors, setSelectedVendors] = useState<string[]>([])
+  const [viewMode, setViewMode] = useState<"summary" | "detailed">("summary")
 
   const filteredQuotes = quotesData.filter(
     (quote) =>
@@ -144,6 +181,21 @@ export default function QuotesPage() {
       default:
         return "bg-gray-100 text-gray-800"
     }
+  }
+
+  const toggleVendor = (vendor: string) => {
+    setSelectedVendors((prev) =>
+      prev.includes(vendor)
+        ? prev.filter((v) => v !== vendor)
+        : [...prev, vendor]
+    )
+  }
+
+  const getLowestPrice = (itemName: string) => {
+    return Math.min(...mockQuotes.map((quote) => {
+      const item = quote.items.find((i) => i.name === itemName)
+      return item ? item.price : Infinity
+    }))
   }
 
   return (
@@ -425,6 +477,131 @@ export default function QuotesPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Quote Comparison</h1>
+        <Tabs defaultValue="summary" className="w-[400px]">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="summary">Summary View</TabsTrigger>
+            <TabsTrigger value="detailed">Detailed View</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        {mockQuotes.map((quote) => (
+          <Card
+            key={quote.vendor}
+            className={`cursor-pointer transition-all ${
+              selectedVendors.includes(quote.vendor)
+                ? "border-primary shadow-lg"
+                : "hover:border-primary/50"
+            }`}
+            onClick={() => toggleVendor(quote.vendor)}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                {quote.vendor}
+                {selectedVendors.includes(quote.vendor) ? (
+                  <CheckCircle2 className="text-primary" />
+                ) : (
+                  <XCircle className="text-muted-foreground" />
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total Amount:</span>
+                  <span className="font-semibold">${quote.totalAmount}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Delivery Time:</span>
+                  <span className="font-semibold">{quote.deliveryTime}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {viewMode === "summary" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Summary Comparison</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Item</TableHead>
+                  {mockQuotes.map((quote) => (
+                    <TableHead key={quote.vendor}>{quote.vendor}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {mockQuotes[0].items.map((item) => (
+                  <TableRow key={item.name}>
+                    <TableCell className="font-medium">{item.name}</TableCell>
+                    {mockQuotes.map((quote) => {
+                      const quoteItem = quote.items.find(
+                        (i) => i.name === item.name
+                      )
+                      const isLowest = quoteItem?.price === getLowestPrice(item.name)
+                      return (
+                        <TableCell
+                          key={quote.vendor}
+                          className={isLowest ? "text-green-600" : ""}
+                        >
+                          ${quoteItem?.price.toFixed(2)}
+                          {isLowest && (
+                            <Badge variant="secondary" className="ml-2">
+                              Lowest
+                            </Badge>
+                          )}
+                        </TableCell>
+                      )
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Detailed Comparison</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Item</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>Unit Price</TableHead>
+                  <TableHead>Total</TableHead>
+                  <TableHead>Vendor</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {mockQuotes.map((quote) =>
+                  quote.items.map((item) => (
+                    <TableRow key={`${quote.vendor}-${item.name}`}>
+                      <TableCell className="font-medium">{item.name}</TableCell>
+                      <TableCell>{item.quantity}</TableCell>
+                      <TableCell>${item.price.toFixed(2)}</TableCell>
+                      <TableCell>${item.total.toFixed(2)}</TableCell>
+                      <TableCell>{quote.vendor}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

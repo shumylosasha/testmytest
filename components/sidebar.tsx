@@ -4,13 +4,13 @@ import { useSidebar } from "@/components/sidebar-provider"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { BarChart3, Package, ShoppingCart, Users, FileCheck, Bot } from "lucide-react"
+import { BarChart3, Package, ShoppingCart, Users, FileCheck, FileBarChart } from "lucide-react"
 
 const menuItems = [
-  { name: "Dashboard", href: "/", icon: BarChart3 },
-  { name: "Orders", href: "/orders", icon: ShoppingCart },
   { name: "Inventory", href: "/inventory", icon: Package },
+  { name: "Orders", href: "/orders", icon: ShoppingCart },
   { name: "Vendors", href: "/vendors", icon: Users },
+  { name: "Reports", href: "/reports", icon: FileBarChart },
   { name: "Compliance", href: "/compliance", icon: FileCheck },
 ]
 
@@ -20,10 +20,13 @@ export default function Sidebar() {
 
   return (
     <div
-      className={cn("h-screen bg-background border-r transition-all duration-300 relative", isOpen ? "w-20" : "w-20")}
+      className={cn(
+        "h-screen bg-white border-r transition-all duration-300 relative",
+        isOpen ? "w-[104px]" : "w-[104px]"
+      )}
     >
       <div className="p-4 flex justify-center items-center">
-        <h2 className="font-bold text-xl">M</h2>
+        <h2 className="font-bold text-xl">AMS</h2>
       </div>
 
       <nav className="mt-6">

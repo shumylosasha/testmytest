@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { inventoryData } from '@/app/data/inventory-data'
 
 export async function GET(
   request: Request,
@@ -8,52 +9,17 @@ export async function GET(
   console.log(`Fetching inventory item with ID: ${id}`) // Debug log
 
   try {
-    console.log('Making request to Flask backend...') // Debug log
-    const response = await fetch(`http://localhost:5001/api/inventory/item/${id}`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      next: { revalidate: 0 } // Disable cache
-    })
-
-    console.log(`Backend response status: ${response.status}`) // Debug log
+    // Find the item in mockup data instead of fetching from backend
+    const item = inventoryData.find(item => item.id === id)
     
-    // Log response headers for debugging
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()))
-
-    if (!response.ok) {
-      console.error(`Backend error: ${response.status} ${response.statusText}`) // Debug log
+    if (!item) {
       return NextResponse.json(
-        { error: `Failed to fetch inventory item: ${response.statusText}` },
-        { status: response.status }
+        { error: 'Item not found' },
+        { status: 404 }
       )
     }
-
-    const contentType = response.headers.get('content-type')
-    if (!contentType || !contentType.includes('application/json')) {
-      console.error(`Invalid content type: ${contentType}`) // Debug log
-      return NextResponse.json(
-        { error: 'Invalid response from backend' },
-        { status: 500 }
-      )
-    }
-
-    const text = await response.text() // Get raw response text
-    console.log('Raw response:', text) // Debug log
-
-    try {
-      const data = JSON.parse(text)
-      console.log('Successfully parsed data:', data) // Debug log
-      return NextResponse.json(data)
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError) // Debug log
-      return NextResponse.json(
-        { error: 'Invalid JSON response from backend' },
-        { status: 500 }
-      )
-    }
+    
+    return NextResponse.json(item)
   } catch (error: any) {
     console.error('Error in inventory item API route:', error) // Debug log
     return NextResponse.json(

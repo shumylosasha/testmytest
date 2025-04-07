@@ -7,6 +7,8 @@ export const ordersData = [
     total: 1245.67,
     status: "Completed",
     estimatedDelivery: "Delivered",
+    paymentTerms: "Net 30",
+    deliveryTime: "3-5 days"
   },
   {
     id: "ORD-2023-002",
@@ -16,6 +18,8 @@ export const ordersData = [
     total: 876.5,
     status: "Processing",
     estimatedDelivery: "Dec 27, 2023",
+    paymentTerms: "Net 45",
+    deliveryTime: "2-3 days"
   },
   {
     id: "ORD-2023-003",
@@ -25,6 +29,8 @@ export const ordersData = [
     total: 345.25,
     status: "Pending",
     estimatedDelivery: "Dec 29, 2023",
+    paymentTerms: "Net 60",
+    deliveryTime: "5-7 days"
   },
   {
     id: "ORD-2023-004",
@@ -34,6 +40,8 @@ export const ordersData = [
     total: 567.8,
     status: "Completed",
     estimatedDelivery: "Delivered",
+    paymentTerms: "Net 30",
+    deliveryTime: "3-5 days"
   },
   {
     id: "ORD-2023-005",
@@ -43,6 +51,8 @@ export const ordersData = [
     total: 1890.45,
     status: "Completed",
     estimatedDelivery: "Delivered",
+    paymentTerms: "Net 45",
+    deliveryTime: "2-3 days"
   },
   {
     id: "ORD-2023-006",
@@ -52,6 +62,8 @@ export const ordersData = [
     total: 432.1,
     status: "Processing",
     estimatedDelivery: "Dec 26, 2023",
+    paymentTerms: "Net 30",
+    deliveryTime: "3-5 days"
   },
   {
     id: "ORD-2023-007",
@@ -61,6 +73,8 @@ export const ordersData = [
     total: 987.65,
     status: "Cancelled",
     estimatedDelivery: "Cancelled",
+    paymentTerms: "Net 45",
+    deliveryTime: "2-3 days"
   },
   {
     id: "ORD-2023-008",
@@ -70,6 +84,8 @@ export const ordersData = [
     total: 543.21,
     status: "Draft",
     estimatedDelivery: "Not scheduled",
+    paymentTerms: "Net 30",
+    deliveryTime: "3-5 days"
   },
 ]
 

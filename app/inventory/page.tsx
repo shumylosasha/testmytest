@@ -18,12 +18,15 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Search, Filter, MoreHorizontal, Upload, Plus } from "lucide-react"
 import { inventoryData } from "@/data/inventory-data"
 import Link from "next/link"
+import { InventoryQuickActions } from "../components/inventory-quick-actions"
+import Image from "next/image"
 
 export default function InventoryPage() {
   const [selectedItems, setSelectedItems] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState("")
+  const [items, setItems] = useState(inventoryData)
 
-  const filteredItems = inventoryData.filter((item) => item.name.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filteredItems = items.filter((item) => item.name.toLowerCase().includes(searchQuery.toLowerCase()))
 
   const toggleItemSelection = (id: string) => {
     if (selectedItems.includes(id)) {
@@ -54,6 +57,36 @@ export default function InventoryPage() {
     }
   }
 
+  const handleAddItem = () => {
+    // In a real app, this would open a form or navigate to an add item page
+    alert("Add item functionality would open here")
+  }
+
+  const handleUploadInventory = async (file: File) => {
+    try {
+      // Simulate processing time
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      alert("File uploaded successfully!")
+    } catch (error) {
+      console.error("Error uploading file:", error)
+      alert("Failed to upload file")
+    }
+  }
+
+  const handleChatWithAI = () => {
+    // The chat functionality is handled directly in the InventoryQuickActions component
+  }
+
+  const handleCreateOrder = () => {
+    if (selectedItems.length > 0) {
+      window.location.href = "/orders/create"
+    }
+  }
+
+  const handleNewItemsAdded = (newItems: any[]) => {
+    setItems(prevItems => [...newItems, ...prevItems])
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -61,16 +94,6 @@ export default function InventoryPage() {
           <div>
             <CardTitle>All Items</CardTitle>
             <CardDescription>Manage your hospital inventory items</CardDescription>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" className="gap-2">
-              <Upload className="h-4 w-4" />
-              Upload Inventory
-            </Button>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Item
-            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -85,7 +108,6 @@ export default function InventoryPage() {
               />
             </div>
             <div className="flex gap-2">
-              {selectedItems.length > 0 && <Button variant="outline">Add {selectedItems.length} to Order</Button>}
               <Button variant="outline" size="icon">
                 <Filter className="h-4 w-4" />
               </Button>
@@ -131,12 +153,21 @@ export default function InventoryPage() {
                       />
                     </TableCell>
                     <TableCell>
-                      <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center">
-                        <img
-                          src={item.image || `/placeholder.svg?height=40&width=40`}
-                          alt={item.name}
-                          className="max-w-full max-h-full object-contain"
-                        />
+                      <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center overflow-hidden">
+                        {item.image ? (
+                          <Image
+                            src={item.image}
+                            alt={item.name}
+                            width={40}
+                            height={40}
+                            className="object-contain"
+                            unoptimized
+                          />
+                        ) : (
+                          <div className="w-10 h-10 bg-gray-200 flex items-center justify-center">
+                            <span className="text-gray-400 text-xs">No image</span>
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="font-medium">
@@ -157,12 +188,16 @@ export default function InventoryPage() {
                     <TableCell>{item.packaging}</TableCell>
                     <TableCell>{item.expiresIn}</TableCell>
                     <TableCell className="text-center">
-                      <Badge
-                        variant="outline"
-                        className="bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer"
-                      >
-                        {item.swaps.length}
-                      </Badge>
+                      {item.swaps?.length > 0 ? (
+                        <Badge
+                          variant="outline"
+                          className="bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer"
+                        >
+                          {item.swaps.length}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-center">
                       {item.potentialSavings > 0 ? (
@@ -198,6 +233,15 @@ export default function InventoryPage() {
           </div>
         </CardContent>
       </Card>
+
+      <InventoryQuickActions
+        onAddItem={handleAddItem}
+        onUploadInventory={handleUploadInventory}
+        onChatWithAI={handleChatWithAI}
+        selectedItemsCount={selectedItems.length}
+        onCreateOrder={handleCreateOrder}
+        onNewItemsAdded={handleNewItemsAdded}
+      />
     </div>
   )
 }

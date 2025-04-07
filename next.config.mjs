@@ -15,6 +15,13 @@ const nextConfig = {
   },
   images: {
     unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'www.medline.com',
+        pathname: '/media/catalog/product/**',
+      },
+    ],
   },
   experimental: {
     webpackBuildWorker: true,
@@ -22,14 +29,15 @@ const nextConfig = {
     parallelServerCompiles: true,
   },
   output: 'standalone',
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api/:path*',
-      },
-    ]
-  },
+  // Removing API rewrites that point to the backend
+  // async rewrites() {
+  //   return [
+  //     {
+  //       source: '/api/:path*',
+  //       destination: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api/:path*',
+  //     },
+  //   ]
+  // },
 }
 
 mergeConfig(nextConfig, userConfig)
