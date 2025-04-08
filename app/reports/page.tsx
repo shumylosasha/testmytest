@@ -29,6 +29,8 @@ import {
   Bot,
   Globe,
   TrendingUp,
+  Users,
+  User,
 } from "lucide-react"
 import { ReportsQuickActions } from "./components/reports-quick-actions"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -55,6 +57,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { departmentData, productData, surgeonData, calculateDifference, getComparisonColor } from "../data/comparison-data"
 
 // Mock data for opportunity reports
 const opportunityReports = [
@@ -342,6 +352,13 @@ export default function ReportsPage() {
   const [selectedRecommendations, setSelectedRecommendations] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState("savings")
   const [showPdfPreview, setShowPdfPreview] = useState(false)
+  
+  // New state for comparison functionality
+  const [comparisonType, setComparisonType] = useState<"department" | "product" | "surgeon" | null>(null)
+  const [firstEntity, setFirstEntity] = useState<string>("")
+  const [secondEntity, setSecondEntity] = useState<string>("")
+  const [selectedMetrics, setSelectedMetrics] = useState<string[]>([])
+  const [showComparison, setShowComparison] = useState(false)
 
   const toggleRecommendation = (id: string) => {
     setSelectedRecommendations((prev) =>
@@ -451,6 +468,16 @@ export default function ReportsPage() {
               }`}
             >
               Tariffs
+            </button>
+            <button
+              onClick={() => setActiveTab("compare")}
+              className={`pb-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === "compare"
+                  ? "border-black text-black"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              Compare
             </button>
           </nav>
         </div>
@@ -873,6 +900,390 @@ export default function ReportsPage() {
                   </div>
                 </CardContent>
               </Card>
+            </>
+          )}
+
+          {activeTab === "compare" && (
+            <>
+              {/* Comparison Type Selector */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Comparison Analysis</CardTitle>
+                  <CardDescription>Select comparison type and entities to analyze</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Comparison Type */}
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-medium">Comparison Type</h3>
+                      <div className="space-y-2">
+                        <Button 
+                          variant={comparisonType === "department" ? "default" : "outline"} 
+                          className="w-full justify-start"
+                          onClick={() => {
+                            setComparisonType("department")
+                            setFirstEntity("")
+                            setSecondEntity("")
+                            setSelectedMetrics([])
+                            setShowComparison(false)
+                          }}
+                        >
+                          <Users className="mr-2 h-4 w-4" />
+                          Department-to-Department
+                        </Button>
+                        <Button 
+                          variant={comparisonType === "product" ? "default" : "outline"} 
+                          className="w-full justify-start"
+                          onClick={() => {
+                            setComparisonType("product")
+                            setFirstEntity("")
+                            setSecondEntity("")
+                            setSelectedMetrics([])
+                            setShowComparison(false)
+                          }}
+                        >
+                          <Package className="mr-2 h-4 w-4" />
+                          Product-to-Product
+                        </Button>
+                        <Button 
+                          variant={comparisonType === "surgeon" ? "default" : "outline"} 
+                          className="w-full justify-start"
+                          onClick={() => {
+                            setComparisonType("surgeon")
+                            setFirstEntity("")
+                            setSecondEntity("")
+                            setSelectedMetrics([])
+                            setShowComparison(false)
+                          }}
+                        >
+                          <User className="mr-2 h-4 w-4" />
+                          Surgeon-to-Surgeon
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Entity Selection */}
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-medium">Select Entities</h3>
+                      <div className="space-y-2">
+                        <Select
+                          value={firstEntity}
+                          onValueChange={setFirstEntity}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select first entity" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {comparisonType === "department" && Object.entries(departmentData).map(([key, dept]) => (
+                              <SelectItem key={key} value={key}>
+                                {dept.name}
+                              </SelectItem>
+                            ))}
+                            {comparisonType === "product" && [...productData.surgicalSupplies, ...productData.medications].map((product) => (
+                              <SelectItem key={product.brand} value={product.brand}>
+                                {product.name} ({product.brand})
+                              </SelectItem>
+                            ))}
+                            {comparisonType === "surgeon" && surgeonData.surgery.map((surgeon) => (
+                              <SelectItem key={surgeon.name} value={surgeon.name}>
+                                {surgeon.name} - {surgeon.specialty}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={secondEntity}
+                          onValueChange={setSecondEntity}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select second entity" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {comparisonType === "department" && Object.entries(departmentData).map(([key, dept]) => (
+                              <SelectItem key={key} value={key}>
+                                {dept.name}
+                              </SelectItem>
+                            ))}
+                            {comparisonType === "product" && [...productData.surgicalSupplies, ...productData.medications].map((product) => (
+                              <SelectItem key={product.brand} value={product.brand}>
+                                {product.name} ({product.brand})
+                              </SelectItem>
+                            ))}
+                            {comparisonType === "surgeon" && surgeonData.surgery.map((surgeon) => (
+                              <SelectItem key={surgeon.name} value={surgeon.name}>
+                                {surgeon.name} - {surgeon.specialty}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Metrics Selection */}
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-medium">Metrics to Compare</h3>
+                      <div className="space-y-2">
+                        {comparisonType === "department" && (
+                          <>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                id="costPerUnit" 
+                                checked={selectedMetrics.includes("costPerUnit")}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedMetrics([...selectedMetrics, "costPerUnit"])
+                                  } else {
+                                    setSelectedMetrics(selectedMetrics.filter(m => m !== "costPerUnit"))
+                                  }
+                                }}
+                              />
+                              <label htmlFor="costPerUnit">Cost per Unit</label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                id="utilizationRate" 
+                                checked={selectedMetrics.includes("utilizationRate")}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedMetrics([...selectedMetrics, "utilizationRate"])
+                                  } else {
+                                    setSelectedMetrics(selectedMetrics.filter(m => m !== "utilizationRate"))
+                                  }
+                                }}
+                              />
+                              <label htmlFor="utilizationRate">Utilization Rate</label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                id="qualityScore" 
+                                checked={selectedMetrics.includes("qualityScore")}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedMetrics([...selectedMetrics, "qualityScore"])
+                                  } else {
+                                    setSelectedMetrics(selectedMetrics.filter(m => m !== "qualityScore"))
+                                  }
+                                }}
+                              />
+                              <label htmlFor="qualityScore">Quality Score</label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                id="operationalEfficiency" 
+                                checked={selectedMetrics.includes("operationalEfficiency")}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedMetrics([...selectedMetrics, "operationalEfficiency"])
+                                  } else {
+                                    setSelectedMetrics(selectedMetrics.filter(m => m !== "operationalEfficiency"))
+                                  }
+                                }}
+                              />
+                              <label htmlFor="operationalEfficiency">Operational Efficiency</label>
+                            </div>
+                          </>
+                        )}
+                        {comparisonType === "product" && (
+                          <>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                id="cost" 
+                                checked={selectedMetrics.includes("cost")}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedMetrics([...selectedMetrics, "cost"])
+                                  } else {
+                                    setSelectedMetrics(selectedMetrics.filter(m => m !== "cost"))
+                                  }
+                                }}
+                              />
+                              <label htmlFor="cost">Cost</label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                id="quality" 
+                                checked={selectedMetrics.includes("quality")}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedMetrics([...selectedMetrics, "quality"])
+                                  } else {
+                                    setSelectedMetrics(selectedMetrics.filter(m => m !== "quality"))
+                                  }
+                                }}
+                              />
+                              <label htmlFor="quality">Quality</label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                id="usage" 
+                                checked={selectedMetrics.includes("usage")}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedMetrics([...selectedMetrics, "usage"])
+                                  } else {
+                                    setSelectedMetrics(selectedMetrics.filter(m => m !== "usage"))
+                                  }
+                                }}
+                              />
+                              <label htmlFor="usage">Usage</label>
+                            </div>
+                          </>
+                        )}
+                        {comparisonType === "surgeon" && (
+                          <>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                id="procedures" 
+                                checked={selectedMetrics.includes("procedures")}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedMetrics([...selectedMetrics, "procedures"])
+                                  } else {
+                                    setSelectedMetrics(selectedMetrics.filter(m => m !== "procedures"))
+                                  }
+                                }}
+                              />
+                              <label htmlFor="procedures">Procedures</label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                id="successRate" 
+                                checked={selectedMetrics.includes("successRate")}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedMetrics([...selectedMetrics, "successRate"])
+                                  } else {
+                                    setSelectedMetrics(selectedMetrics.filter(m => m !== "successRate"))
+                                  }
+                                }}
+                              />
+                              <label htmlFor="successRate">Success Rate</label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                id="costEfficiency" 
+                                checked={selectedMetrics.includes("costEfficiency")}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedMetrics([...selectedMetrics, "costEfficiency"])
+                                  } else {
+                                    setSelectedMetrics(selectedMetrics.filter(m => m !== "costEfficiency"))
+                                  }
+                                }}
+                              />
+                              <label htmlFor="costEfficiency">Cost Efficiency</label>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-6 flex justify-end">
+                    <Button
+                      onClick={() => {
+                        if (comparisonType && firstEntity && secondEntity && selectedMetrics.length > 0) {
+                          setShowComparison(true)
+                        }
+                      }}
+                      disabled={!comparisonType || !firstEntity || !secondEntity || selectedMetrics.length === 0}
+                    >
+                      Compare
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Comparison Results */}
+              {showComparison && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Cost Comparison */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Metrics Comparison</CardTitle>
+                        <CardDescription>Selected metrics comparison</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-[300px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={selectedMetrics.map(metric => ({
+                              name: metric,
+                              [firstEntity]: comparisonType === "department" 
+                                ? departmentData[firstEntity as keyof typeof departmentData].metrics[metric as keyof typeof departmentData.surgery.metrics]
+                                : comparisonType === "product"
+                                  ? [...productData.surgicalSupplies, ...productData.medications].find(p => p.brand === firstEntity)?.[metric as keyof typeof productData.surgicalSupplies[0]] || 0
+                                  : surgeonData.surgery.find(s => s.name === firstEntity)?.[metric as keyof typeof surgeonData.surgery[0]] || 0,
+                              [secondEntity]: comparisonType === "department"
+                                ? departmentData[secondEntity as keyof typeof departmentData].metrics[metric as keyof typeof departmentData.surgery.metrics]
+                                : comparisonType === "product"
+                                  ? [...productData.surgicalSupplies, ...productData.medications].find(p => p.brand === secondEntity)?.[metric as keyof typeof productData.surgicalSupplies[0]] || 0
+                                  : surgeonData.surgery.find(s => s.name === secondEntity)?.[metric as keyof typeof surgeonData.surgery[0]] || 0,
+                            }))}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" />
+                              <YAxis />
+                              <Tooltip />
+                              <Legend />
+                              <Bar dataKey={firstEntity} fill="#8884d8" />
+                              <Bar dataKey={secondEntity} fill="#82ca9d" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Detailed Metrics */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Detailed Comparison</CardTitle>
+                        <CardDescription>Side-by-side analysis of selected metrics</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Metric</TableHead>
+                              <TableHead>{comparisonType === "department" 
+                                ? departmentData[firstEntity as keyof typeof departmentData].name 
+                                : firstEntity}</TableHead>
+                              <TableHead>{comparisonType === "department"
+                                ? departmentData[secondEntity as keyof typeof departmentData].name
+                                : secondEntity}</TableHead>
+                              <TableHead>Difference</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {selectedMetrics.map(metric => {
+                              const value1 = comparisonType === "department"
+                                ? departmentData[firstEntity as keyof typeof departmentData].metrics[metric as keyof typeof departmentData.surgery.metrics]
+                                : comparisonType === "product"
+                                  ? [...productData.surgicalSupplies, ...productData.medications].find(p => p.brand === firstEntity)?.[metric as keyof typeof productData.surgicalSupplies[0]] || 0
+                                  : surgeonData.surgery.find(s => s.name === firstEntity)?.[metric as keyof typeof surgeonData.surgery[0]] || 0;
+                              const value2 = comparisonType === "department"
+                                ? departmentData[secondEntity as keyof typeof departmentData].metrics[metric as keyof typeof departmentData.surgery.metrics]
+                                : comparisonType === "product"
+                                  ? [...productData.surgicalSupplies, ...productData.medications].find(p => p.brand === secondEntity)?.[metric as keyof typeof productData.surgicalSupplies[0]] || 0
+                                  : surgeonData.surgery.find(s => s.name === secondEntity)?.[metric as keyof typeof surgeonData.surgery[0]] || 0;
+                              const difference = calculateDifference(value1, value2);
+                              
+                              return (
+                                <TableRow key={metric}>
+                                  <TableCell className="capitalize">{metric.replace(/([A-Z])/g, ' $1').trim()}</TableCell>
+                                  <TableCell>{typeof value1 === 'number' ? value1.toFixed(1) : value1}</TableCell>
+                                  <TableCell>{typeof value2 === 'number' ? value2.toFixed(1) : value2}</TableCell>
+                                  <TableCell className={getComparisonColor(difference)}>
+                                    {typeof difference === 'number' ? difference.toFixed(1) : difference}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>

@@ -119,7 +119,7 @@ export default function InventoryItemPage() {
     setIsSearching(true)
     try {
       // Instead of making an API call, use the item's swaps data directly
-      const alternatives: Alternative[] = (item.swaps || []).map((swap) => ({
+      const alternatives: Alternative[] = (item.swaps || []).map((swap, index) => ({
         vendor: swap.vendor || '',
         name: swap.name || '',
         productName: swap.name || '',
@@ -129,7 +129,9 @@ export default function InventoryItemPage() {
         savings: swap.savings || 0,
         shipping: swap.shipping || '--',
         manufacturer: swap.manufacturer || '--',
-        compliance: swap.compliance || 'Pending',
+        compliance: index === 0 ? 'Hospital Approved' : 
+                  index === 1 ? 'Pending Documentation' : 
+                  swap.compliance || 'Pending',
         isSelected: false,
         url: swap.url || '#',
         image: swap.image || null
@@ -269,9 +271,9 @@ export default function InventoryItemPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr,1fr] gap-6">
         {/* Product description moved to the left */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-1 space-y-6">
           <Card>
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -409,19 +411,22 @@ export default function InventoryItemPage() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle>Alternative Vendors</CardTitle>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleFindAlternatives}
-                      disabled={isSearching}
-                      className="h-8 w-8 p-0"
-                    >
-                      {isSearching ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-4 w-4" />
-                      )}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Last updated: {new Date().toLocaleDateString()}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleFindAlternatives}
+                        disabled={isSearching}
+                        className="h-8 w-8 p-0"
+                      >
+                        {isSearching ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
                   </CardHeader>
 
                   <div className="px-6 pb-4">
@@ -470,17 +475,21 @@ export default function InventoryItemPage() {
                                 </div>
                                 <div>
                                   <span className="text-muted-foreground">Manufacturer:</span> {swap.manufacturer}
-                    </div>
-                    <div>
+                                </div>
+                                <div>
                                   <span className="text-muted-foreground">Shipping:</span> {swap.shipping}
-                    </div>
-                    <div>
+                                </div>
+                                <div>
                                   <span className="text-muted-foreground">Vendor:</span> {swap.vendor}
-                    </div>
-                    <div>
+                                </div>
+                                <div className="col-span-2">
                                   <span className="text-muted-foreground">Compliance:</span>{" "}
-                                  <Badge variant="outline" className="bg-green-50 text-green-700">
-                                    {swap.compliance}
+                                  <Badge variant="outline" className={`
+                                    ${swap.compliance === 'Hospital Approved' ? 'bg-green-50 text-green-700 border-green-200' : 
+                                      swap.compliance.includes('Pending') ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                      'bg-blue-50 text-blue-700 border-blue-200'}
+                                  `}>
+                                    {swap.compliance.includes('Pending') ? 'Pending Review' : swap.compliance}
                                   </Badge>
                                 </div>
                               </div>
@@ -790,19 +799,22 @@ export default function InventoryItemPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle>Market Trends & Alerts</CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleMarketResearch}
-                disabled={isResearchingMarket}
-                className="h-8 w-8 p-0"
-              >
-                {isResearchingMarket ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-              </Button>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Last updated: {marketIntelligence?.last_updated || new Date().toLocaleDateString()}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleMarketResearch}
+                  disabled={isResearchingMarket}
+                  className="h-8 w-8 p-0"
+                >
+                  {isResearchingMarket ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -856,12 +868,6 @@ export default function InventoryItemPage() {
                        </Badge>
                      ))}
                    </div>
-                </div>
-
-                {/* Last Updated */}
-                <div className="text-xs text-muted-foreground mt-4">
-                  Last updated: {new Date().toLocaleDateString()}
-                   {/* • Tariff data from [Source Name]. */}
                 </div>
               </div>
             </CardContent>

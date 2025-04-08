@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, FileUp, Loader2, Plus, Search, Trash2, TrendingDown, BookOpen, RefreshCw, ExternalLink, Sparkles, Star, StarHalf, MessageSquare, Mail, ChevronDown, MessageSquareText, Scale, Building2, History, AlertTriangle, FileText, ShoppingCart, BookmarkPlus, Package, DollarSign, X, ChevronRight, CheckCircle2, Clock, CheckCircle, PhoneCall, Filter, XCircle, ShieldCheck } from "lucide-react"
+import { ChevronLeft, FileUp, Loader2, Plus, Search, Trash2, TrendingDown, BookOpen, RefreshCw, ExternalLink, Sparkles, Star, StarHalf, MessageSquare, Mail, ChevronDown, MessageSquareText, Scale, Building2, History, AlertTriangle, FileText, ShoppingCart, BookmarkPlus, Package, DollarSign, X, ChevronRight, CheckCircle2, Clock, CheckCircle, PhoneCall, Filter, XCircle, ShieldCheck, ArrowUpDown, Minus, Truck } from "lucide-react"
 import { inventoryData } from "@/data/inventory-data"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
@@ -26,6 +26,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { cn } from "@/lib/utils"
+import type { InventoryItem } from "@/data/inventory-data"
+import { ordersData, type Order } from "@/data/orders-data"
+import Image from "next/image"
 
 interface Feedback {
   doctorName: string;
@@ -35,59 +39,51 @@ interface Feedback {
 }
 
 interface Vendor {
-  name: string;
-  productName: string;
-  price: number | null;
-  savings: number | null;
-  delivery: string;
-  packaging: string;
-  isSelected: boolean;
-  url: string;
-  image_url?: string | null;
   id: string;
-  contactEmail?: string;
-  contactPhone?: string;
-  certifications?: string[];
-  reviews?: {
-    rating: number;
-    count: number;
-    recentReviews: Array<{
-      rating: number;
-      comment: string;
-      date: string;
-      reviewer: string;
-    }>;
+  name: string;
+  image_url?: string;
+  price?: number;
+  savings?: number | null;
+  manufacturer?: string;
+  compliance?: string;
+  shipping?: string;
+  packaging?: string;
+  notes?: {
+    hospitalUsage?: string;
+    stockWarning?: string;
   };
-  notes?: string[];
-  complianceStatus?: string;
-  warranty?: string;
-  returnPolicy?: string;
-  minimumOrderQuantity?: number;
-  bulkDiscounts?: Array<{
-    quantity: number;
-    discount: number;
-  }>;
-  // Add mock performance data
-  onTimeDeliveryRate?: number;
-  fillRate?: number;
-  qualityRating?: number; // e.g., scale of 1-5 or specific metric
+  url?: string;
+  status: {
+    isCurrentVendor: boolean;
+  isSelected: boolean;
+  };
+  productName?: string;
+  delivery?: string;
+  qualityRating?: number;
+  contactEmail?: string;
+  isDefault?: boolean;
 }
 
 interface SelectedVendorAction {
   itemId: string;
   vendorId: string;
   vendor: Vendor;
+  action: string; // Add the action property to fix the TypeScript error
 }
 
 interface OrderDetailsOverlayProps {
   isOpen: boolean;
   onClose: () => void;
-  item: any;
-  alternativeVendors: { [key: string]: any[] };
-  setSelectedItems: React.Dispatch<React.SetStateAction<any[]>>;
-  handleFindAlternatives: (itemId: string) => void;
-  loadingAlternatives: { [key: string]: boolean };
-  renderStars: (rating: number) => React.ReactNode; // Add renderStars prop
+  item: OrderItem;
+  alternativeVendors: any[];
+  setSelectedItems?: React.Dispatch<React.SetStateAction<OrderItem[]>>;
+  handleFindAlternatives?: (itemId: string) => void;
+  loadingAlternatives?: { [key: string]: boolean };
+  renderStars: (rating: number) => React.ReactNode;
+  selectedVendors?: { [key: string]: string[] };
+  setSelectedVendors?: React.Dispatch<React.SetStateAction<{ [key: string]: string[] }>>;
+  setSelectedVendorActions?: React.Dispatch<React.SetStateAction<SelectedVendorAction[]>>;
+  onAddAlternativeVendor: (itemId: string, vendor: Vendor) => void; // Add the new prop
 }
 
 interface RfqItem {
@@ -107,6 +103,51 @@ interface VendorInfo {
 interface CommunicationPrefs {
   email: boolean;
   aiCall: boolean;
+}
+
+interface Swap {
+  id: string;
+  name: string;
+  price: number;
+  manufacturer: string;
+  compliance: string;
+  vendor: {
+    id: string;
+    name: string;
+  };
+  pricePerUnit: number;
+  packaging: string;
+  delivery?: string;
+  vendor_image_url?: string;
+  isDefault?: boolean;
+}
+
+interface BaseItem {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  price: number;
+  currentVendor?: string;
+  unitPrice?: number;
+  image?: string;
+  sku?: string;
+  status?: string;
+  description?: string;
+  manufacturer?: string;
+  category?: string;
+}
+
+interface OrderItem extends BaseItem {
+  selectedVendor?: Vendor;
+  selectedVendorIds?: string[];
+  selectedVendors?: Vendor[];
+  vendors: Vendor[];  // Make vendors required
+  vendor?: string;    // Add optional vendor field for backward compatibility
+}
+
+interface InventoryItemWithVendor extends BaseItem {
+  vendors: Vendor[];
 }
 
 const VENDOR_LOGOS = {
@@ -198,7 +239,6 @@ const MOCK_ALTERNATIVES = {
         { quantity: 100, discount: 10 },
         { quantity: 200, discount: 15 }
       ],
-      // Add mock performance data
       onTimeDeliveryRate: 98.5,
       fillRate: 99.2,
       qualityRating: 4.7,
@@ -249,7 +289,6 @@ const MOCK_ALTERNATIVES = {
         { quantity: 50, discount: 10 },
         { quantity: 100, discount: 15 }
       ],
-      // Add mock performance data
       onTimeDeliveryRate: 99.0,
       fillRate: 99.5,
       qualityRating: 4.9,
@@ -304,7 +343,7 @@ const MOCK_ALTERNATIVES = {
   ]
 };
 
-const OrderDetailsOverlay = ({ 
+const OrderDetailsOverlay: React.FC<OrderDetailsOverlayProps> = ({ 
   isOpen, 
   onClose, 
   item, 
@@ -312,19 +351,92 @@ const OrderDetailsOverlay = ({
   setSelectedItems,
   handleFindAlternatives,
   loadingAlternatives,
-  renderStars
-}: OrderDetailsOverlayProps) => {
+  renderStars,
+  selectedVendors,
+  setSelectedVendors,
+  setSelectedVendorActions,
+  onAddAlternativeVendor
+}) => {
   const overlayRef = React.useRef<HTMLDivElement>(null);
   const [chartVisible, setChartVisible] = useState(false);
   const [activeTab, setActiveTab] = useState("details");
+  const [expandedItems, setExpandedItems] = useState<{ [key: string]: boolean }>({});
+  const [localItem, setLocalItem] = useState<OrderItem | null>(null);
+  const [productFeedback] = useState<{ [key: string]: Feedback[] }>({
+    'default-feedback': [
+      { doctorName: "Dr. Smith", rating: 4.5, comment: "Excellent quality, would recommend", date: "2024-03-15" },
+      { doctorName: "Dr. Johnson", rating: 5, comment: "Best in class, very reliable", date: "2024-03-14" },
+      { doctorName: "Dr. Williams", rating: 4, comment: "Good product, slight delay in delivery", date: "2024-03-13" }
+    ]
+  });
 
-  const handleVendorSelect = (itemId: string, vendorId: string, vendor: Vendor) => {
-    setSelectedItems(prev => prev.map(i => 
-      i.id === itemId 
-        ? { ...i, selectedVendor: vendor }
-        : i
-    ));
-    onClose();
+  // Update localItem when item prop changes
+  useEffect(() => {
+    setLocalItem(item);
+  }, [item]);
+
+  const handleVendorSelect = (itemId: string, vendorName: string, vendor: Vendor) => {
+    if (!localItem) return;
+
+    // Update local state first
+    const updatedVendors = localItem.vendors.map(v => ({
+      ...v,
+      status: {
+        ...v.status,
+        isSelected: v.id === vendor.id ? !v.status.isSelected : v.status.isSelected
+      }
+    }));
+
+    setLocalItem({
+      ...localItem,
+      vendors: updatedVendors
+    });
+
+    // Update global state
+    setSelectedItems(prev => prev.map(item => {
+      if (item.id === itemId) {
+        return {
+          ...item,
+          vendors: updatedVendors,
+          ...(updatedVendors.find(v => v.id === vendor.id)?.status.isSelected ? {
+            selectedVendorIds: [...new Set([...(item.selectedVendorIds || []), vendor.id])],
+            selectedVendors: [...new Set([...(item.selectedVendors || []), vendor])]
+          } : {
+            selectedVendorIds: (item.selectedVendorIds || []).filter(id => id !== vendor.id),
+            selectedVendors: (item.selectedVendors || []).filter(v => v.id !== vendor.id)
+          })
+        };
+      }
+      return item;
+    }));
+
+    // Update the selectedVendors state
+    if (setSelectedVendors) {
+      setSelectedVendors(prev => {
+        const currentIds = prev[itemId] || [];
+        const isSelected = !currentIds.includes(vendor.id);
+        
+        return {
+          ...prev,
+          [itemId]: isSelected 
+            ? [...currentIds, vendor.id]
+            : currentIds.filter(id => id !== vendor.id)
+        };
+      });
+    }
+
+    // Update the selectedVendorActions state
+    if (setSelectedVendorActions) {
+      setSelectedVendorActions(prev => [
+        ...prev,
+        {
+          itemId,
+          vendorId: vendor.id,
+          vendor,
+          action: 'select'
+        }
+      ]);
+    }
   };
 
   // Generate fake historical data for the chart
@@ -384,10 +496,10 @@ const OrderDetailsOverlay = ({
     }
   }, [isOpen]);
 
-  if (!isOpen || !item) return null;
+  if (!isOpen || !localItem) return null;
 
-  const baselinePrice = item.unitPrice;
-  const alternativePrices = alternativeVendors[item.id]?.map(v => v.price) || [];
+  const baselinePrice = localItem.unitPrice;
+  const alternativePrices = alternativeVendors[localItem.id]?.map((v: any) => v.price) || [];
   const allPrices = [baselinePrice, ...alternativePrices];
   const minPrice = Math.min(...allPrices);
   const maxPrice = Math.max(...allPrices);
@@ -396,11 +508,11 @@ const OrderDetailsOverlay = ({
 
   // Generate historical data for each vendor
   const baselineHistory = generateHistoricalData(baselinePrice);
-  const alternativeHistories = alternativePrices.map(price => generateHistoricalData(price));
+  const alternativeHistories = alternativePrices.map((price: number) => generateHistoricalData(price));
 
   return (
     <AnimatePresence>
-      {isOpen && (
+      {isOpen && localItem && (
         <>
           {/* Backdrop */}
           <motion.div
@@ -418,7 +530,7 @@ const OrderDetailsOverlay = ({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="fixed inset-y-0 right-0 w-[calc(100%-32px)] max-w-[720px] bg-white shadow-lg z-50"
+            className="fixed inset-y-0 right-0 w-[calc(100%-32px)] max-w-[900px] bg-white shadow-lg z-50"
             onClick={e => e.stopPropagation()}
           >
             <div className="h-full flex flex-col">
@@ -427,7 +539,7 @@ const OrderDetailsOverlay = ({
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-sm text-muted-foreground">Product Information</div> {/* Changed title */}
-                    <div className="text-lg font-semibold">{item.name}</div> {/* Show item name */} 
+                    <div className="text-lg font-semibold">{localItem.name}</div> {/* Show item name */} 
                   </div>
                   <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
                     <X className="h-4 w-4" />
@@ -467,183 +579,349 @@ const OrderDetailsOverlay = ({
                 <div className="p-6 space-y-6">
                   {activeTab === "details" ? (
                     <>
-                      {/* Item Identification Section */}
-                      <div>
-                        <h3 className="text-sm font-medium mb-4">Item Overview</h3>
-                        <div className="flex items-start gap-4 mb-4">
-                          <div className="w-16 h-16 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
-                            <img
-                              src={item.image || `/placeholder.svg`}
-                              alt={item.name}
-                              className="max-w-full max-h-full object-contain"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <div className="font-medium text-base">{item.name}</div>
-                            <div className="text-sm text-muted-foreground">SKU: {item.sku}</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Product Details Section */}
-                      <div>
-                        <h3 className="text-sm font-medium mb-4">Product Specifications</h3>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                          <div className="text-muted-foreground">Manufacturer:</div>
-                          <div>{item.mfgrName || '--'}</div>
-                          
-                          <div className="text-muted-foreground">Mfg Product #:</div>
-                          <div>{item.mfgProdItem || '--'}</div>
-                          
-                          <div className="text-muted-foreground">Description:</div>
-                          <div>{item.prodDesc || '--'}</div>
-
-                          <div className="text-muted-foreground">Available:</div>
-                          <div>{item.productAvailable || '--'}</div>
-                          
-                          <div className="text-muted-foreground">Items/Case:</div>
-                          <div>{item.itemsInCase || '--'}</div>
-                          
-                          <div className="text-muted-foreground">Case MOQ:</div>
-                          <div>{item.caseMOQ || '--'}</div>
-
-                          <div className="text-muted-foreground">Case Price:</div>
-                          <div>{item.casePrice || '--'}</div>
-
-                          <div className="text-muted-foreground">Shipping Included:</div>
-                          <div>{item.priceIncludeShipping || '--'}</div>
-
-                          <div className="text-muted-foreground">Comment:</div>
-                          <div>{item.comment || '--'}</div>
-
-                          <div className="text-muted-foreground">Substitution:</div>
-                          <div>{item.substitutionItem || '--'}</div>
-
-                        </div>
-                      </div>
-
-                      {/* Current Supplier Section */}
-                      {item.vendor && (
-                        <div>
-                          <h3 className="text-sm font-medium mb-4">Current Supplier</h3>
-                          <div className="flex items-center gap-4 p-3 border rounded-lg bg-gray-50">
-                            <div className="w-10 h-10 rounded bg-white border flex items-center justify-center flex-shrink-0">
+                      {/* Item Overview Card */}
+                      <Card>
+                        <CardHeader>
+                          <div className="flex items-start gap-4">
+                            <div className="w-24 h-24 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
                               <img
-                                src={getVendorLogo(item.vendor)}
-                                alt={item.vendor}
-                                className="max-w-full max-h-full object-contain p-1"
-                                onError={(e) => {
-                                  e.currentTarget.src = VENDOR_LOGOS.default;
-                                }}
+                                src={localItem.image || `/placeholder.svg`}
+                                alt={localItem.name}
+                                className="max-w-full max-h-full object-contain"
                               />
                             </div>
                             <div className="flex-1">
-                              <div className="font-medium">{item.vendor}</div>
-                              <div className="text-sm text-muted-foreground">Unit Price: ${(item.unitPrice || 0).toFixed(2)}</div>
+                              <div className="font-medium text-lg">{localItem.name}</div>
+                              <div className="text-sm text-muted-foreground">SKU: {localItem.sku}</div>
+                              <div className="mt-2 flex items-center gap-2">
+                                <div className="flex items-center gap-1">
+                                  <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                                  <span className="text-sm">4.5 (24 reviews)</span>
+                                </div>
+                                {localItem.status === "Urgent" && (
+                                  <Badge variant="destructive" className="h-5 px-1.5 py-0 text-xs font-normal">Urgent</Badge>
+                                )}
+                              </div>
                             </div>
-                            {/* Maybe add a button to switch supplier or view vendor details? */}
                           </div>
-                        </div>
-                      )}
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-sm text-muted-foreground">{localItem.description}</div>
+                        </CardContent>
+                      </Card>
 
-                      {/* Removed Order Info, Customer Info, Payment Summary */}
+                      {/* Product Specifications Card */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Product Specifications</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                            <div>
+                              <div className="text-muted-foreground mb-1">Manufacturer</div>
+                              <div className="font-medium">{localItem.manufacturer || '--'}</div>
+                            </div>
+                            <div>
+                              <div className="text-muted-foreground mb-1">Category</div>
+                              <div className="font-medium">{localItem.category || '--'}</div>
+                            </div>
+                            <div>
+                              <div className="text-muted-foreground mb-1">Status</div>
+                              <div className="font-medium">{localItem.status || '--'}</div>
+                            </div>
+                            <div>
+                              <div className="text-muted-foreground mb-1">Packaging</div>
+                              <div className="font-medium">{localItem.packaging || '--'}</div>
+                            </div>
+                            <div>
+                              <div className="text-muted-foreground mb-1">Current Stock</div>
+                              <div className="font-medium">{localItem.currentStock || 0} / {localItem.totalStock || 0}</div>
+                            </div>
+                            <div>
+                              <div className="text-muted-foreground mb-1">Expires In</div>
+                              <div className="font-medium">{localItem.expiresIn || '--'}</div>
+                            </div>
+                            <div>
+                              <div className="text-muted-foreground mb-1">Last Purchase Price</div>
+                              <div className="font-medium">${localItem.lastPurchasePrice?.toFixed(2) || '--'}</div>
+                            </div>
+                            <div>
+                              <div className="text-muted-foreground mb-1">Current Unit Price</div>
+                              <div className="font-medium">${localItem.unitPrice?.toFixed(2) || '--'}</div>
+                            </div>
+                            <div>
+                              <div className="text-muted-foreground mb-1">Required Units</div>
+                              <div className="font-medium">{localItem.requiredUnits || '--'}</div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Transaction History Card */}
+                      <Card>
+                        <CardHeader 
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => setExpandedItems(prev => ({ ...prev, [localItem.id]: !prev[localItem.id] }))}
+                        >
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-lg">Transaction History</CardTitle>
+                            <Button variant="ghost" size="icon">
+                              {expandedItems[localItem.id] ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </CardHeader>
+                        {expandedItems[localItem.id] && (
+                          <CardContent>
+                            <div className="space-y-4">
+                              {ordersData
+                                .filter((order: Order) => 
+                                  order.items?.some((orderItem: { name: string }) => 
+                                    orderItem.name === localItem.name
+                                  )
+                                )
+                                .map((order: Order) => {
+                                  const orderItem = order.items?.find((i: { name: string }) => i.name === localItem.name);
+                                  return (
+                                    <div key={order.id} className="flex items-center justify-between p-4 border rounded-lg">
+                                      <div className="space-y-1">
+                                        <div className="font-medium">{order.id}</div>
+                                        <div className="text-sm text-muted-foreground">{order.date}</div>
+                                        <div className="text-sm">Department: {order.department}</div>
+                                      </div>
+                                      <div className="text-right space-y-1">
+                                        <div className="font-medium">{orderItem?.quantity} units</div>
+                                        <div className="text-sm">${orderItem?.price.toFixed(2)} per unit</div>
+                                        <Badge 
+                                          variant={
+                                            order.status === "Completed" ? "default" :
+                                            order.status === "Processing" ? "secondary" :
+                                            order.status === "Cancelled" ? "destructive" :
+                                            "outline"
+                                          }
+                                        >
+                                          {order.status}
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          </CardContent>
+                        )}
+                      </Card>
+
+                      {/* Feedback Card */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Recent Feedback</CardTitle>
+                          <CardDescription>Last 3 reviews from healthcare professionals</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            {productFeedback['default-feedback'].map((feedback: Feedback, index: number) => (
+                              <div key={index} className="border-b pb-4 last:border-b-0 last:pb-0">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-sm font-medium">{feedback.doctorName}</span>
+                                  <div className="flex items-center gap-1">
+                                    <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
+                                    <span className="text-xs">{feedback.rating}</span>
+                                  </div>
+                                </div>
+                                <p className="text-sm text-muted-foreground">{feedback.comment}</p>
+                                <span className="text-xs text-muted-foreground">{feedback.date}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
                     </>
                   ) : activeTab === "quotes" ? (
-                    <div className="space-y-4"> {/* Changed from space-y-6 and removed justify-between header */}
-                      <h3 className="text-sm font-medium">Alternative Vendors</h3>
-                      {/* Removed Refresh Button */}
-
-                      {/* Changed layout from grid to vertical flex */}
+                    <div className="space-y-4">
                       <div className="flex flex-col gap-4">
-                        {MOCK_ALTERNATIVES.default.map((vendor) => { // Directly use mock data
-                          const isSelected = item.selectedVendor?.id === vendor.id || item.selectedVendor?.name === vendor.name; // Check if this mock vendor is the currently selected one
+                        {localItem.vendors.map((vendor) => {
+                          const isCurrentVendor = vendor.status.isCurrentVendor;
+                          const isSelected = vendor.status.isSelected;
+                          
                           return (
-                          <Card
-                            key={vendor.id}
-                            className={`transition-all border ${isSelected ? "border-primary shadow-md" : "hover:border-gray-300"}`}
-                          >
-                            <CardContent className="p-4 flex flex-col md:flex-row gap-4">
-                              {/* Vendor Logo & Basic Info */}
-                              <div className="flex flex-col items-center md:items-start md:w-1/4">
-                                <div className="w-16 h-16 mb-2 rounded border bg-white flex items-center justify-center flex-shrink-0 p-1">
-                                  <img
-                                    src={getVendorLogo(vendor.name)}
-                                    alt={vendor.name}
-                                    className="max-w-full max-h-full object-contain"
-                                    onError={(e) => { e.currentTarget.src = VENDOR_LOGOS.default; }}
-                                  />
-                                </div>
-                                <div className="text-center md:text-left">
-                                  <div className="font-medium text-sm">{vendor.name}</div>
-                                  <a href={vendor.url || '#'} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center justify-center md:justify-start gap-1">
-                                    Visit Website <ExternalLink className="h-3 w-3" />
-                                  </a>
-                                </div>
-                              </div>
-
-                              {/* Details Section */}
-                              <div className="flex-1 space-y-2 border-t md:border-t-0 md:border-l md:pl-4 pt-4 md:pt-0">
-                                <div className="flex justify-between items-center">
-                                  <span className="font-medium text-base">{vendor.productName}</span>
-                                  <span className="font-semibold text-lg">${vendor.price?.toFixed(2)}</span>
-                                </div>
-                                {vendor.savings !== null && vendor.savings > 0 && (
-                                  <div className="text-sm text-green-600 font-medium text-right">
-                                    Save ${vendor.savings.toFixed(2)}
-                                  </div>
-                                )}
-                                <div className="text-sm text-muted-foreground grid grid-cols-2 gap-x-4 gap-y-1 pt-1">
-                                  <div>Delivery: <span className="font-medium text-foreground">{vendor.delivery}</span></div>
-                                  <div>Packaging: <span className="font-medium text-foreground">{vendor.packaging}</span></div>
-                                  <div>Warranty: <span className="font-medium text-foreground">{vendor.warranty || 'N/A'}</span></div>
-                                  <div>Returns: <span className="font-medium text-foreground">{vendor.returnPolicy || 'N/A'}</span></div>
-                                </div>
-                                {vendor.certifications && vendor.certifications.length > 0 && (
-                                  <div className="text-xs text-muted-foreground pt-1">
-                                    Certifications: {vendor.certifications.join(', ')}
-                                  </div>
-                                )}
-                                {vendor.reviews && (
-                                  <div className="flex items-center gap-2 pt-1">
-                                    <div className="flex">{renderStars(vendor.reviews.rating)}</div> {/* Use passed prop */}
-                                    <span className="text-xs text-muted-foreground">({vendor.reviews.count} reviews)</span>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Actions Section */}
-                              <div className="flex flex-col justify-center gap-2 border-t md:border-t-0 md:border-l md:pl-4 pt-4 md:pt-0 min-w-[120px]">
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleVendorSelect(item.id, vendor.id, vendor)}
-                                  variant={isSelected ? "default" : "outline"}
-                                  className="w-full gap-2"
+                            <div
+                              key={vendor.id}
+                              className={cn(
+                                "relative rounded-lg border p-4",
+                                isCurrentVendor
+                                  ? "border-blue-200 bg-blue-50"
+                                  : isSelected
+                                  ? "border-primary bg-primary/5"
+                                  : "border-border hover:border-primary"
+                              )}
+                            >
+                              {isCurrentVendor && (
+                                <Badge 
+                                  variant="secondary" 
+                                  className="absolute -top-2 -right-2 bg-blue-100 text-blue-800"
                                 >
-                                  {isSelected ? <CheckCircle className="h-4 w-4" /> : <BookmarkPlus className="h-4 w-4" />}
-                                  {isSelected ? 'Selected' : 'Select'}
-                                </Button>
-                                <Button size="sm" variant="outline" className="w-full gap-2">
-                                  <Mail className="h-4 w-4" /> Email
-                                </Button>
-                                <Button size="sm" variant="outline" className="w-full gap-2">
-                                  <FileText className="h-4 w-4" /> Send RFQ
-                                </Button>
+                                  Current Vendor
+                                </Badge>
+                              )}
+                              <div className="flex items-start gap-4">
+                                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border">
+                                  {vendor.image_url ? (
+                                    <Image
+                                      src={vendor.image_url}
+                                      alt={vendor.name}
+                                      className="object-contain"
+                                      fill
+                                    />
+                                  ) : (
+                                    <div className="flex h-full w-full items-center justify-center bg-muted">
+                                      <Building2 className="h-8 w-8 text-muted-foreground" />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex-1 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <h4 className="font-medium">{vendor.name}</h4>
+                                      <p className="text-sm text-muted-foreground">{vendor.productName}</p>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="font-medium">${vendor.price?.toFixed(2)}</div>
+                                      {vendor.savings !== null && vendor.savings > 0 && (
+                                        <div className="text-sm text-green-600">Save ${vendor.savings.toFixed(2)}</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-1">
+                                        <Package className="h-4 w-4" />
+                                        <span>Manufacturer: {vendor.manufacturer}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <Truck className="h-4 w-4" />
+                                        <span>Delivery: {vendor.delivery}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <ShieldCheck className="h-4 w-4" />
+                                        <span>Compliance: {vendor.compliance}</span>
+                                      </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-1">
+                                        <Clock className="h-4 w-4" />
+                                        <span>Shipping: {vendor.shipping}</span>
+                                      </div>
+                                      {vendor.notes?.hospitalUsage && (
+                                        <div className="flex items-center gap-1">
+                                          <BookOpen className="h-4 w-4" />
+                                          <span>Usage: {vendor.notes.hospitalUsage}</span>
+                                        </div>
+                                      )}
+                                      {vendor.notes?.stockWarning && (
+                                        <div className="flex items-center gap-1 text-amber-600">
+                                          <AlertTriangle className="h-4 w-4" />
+                                          <span>{vendor.notes.stockWarning}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 pt-2">
+                                    <Button
+                                      variant={vendor.status.isSelected ? "default" : "outline"}
+                                      size="sm"
+                                      className="gap-2"
+                                      onClick={() => handleVendorSelect(localItem.id, vendor.name, vendor)}
+                                    >
+                                      {vendor.status.isSelected ? (
+                                        <>
+                                          <CheckCircle className="h-4 w-4" />
+                                          Selected
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Plus className="h-4 w-4" />
+                                          Select
+                                        </>
+                                      )}
+                                    </Button>
+                                    {vendor.url && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-2"
+                                        onClick={() => window.open(vendor.url, '_blank')}
+                                      >
+                                        <ExternalLink className="h-4 w-4" />
+                                        Website
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                            </CardContent>
-                          </Card>
-                        )}
-                      )}
+                            </div>
+                          );
+                        })}
                       </div>
 
-                      {/* Price History section (optional, can be kept or removed) */}
-                      <div className="border-t pt-4 mt-6">
-                        <h4 className="text-sm font-medium mb-3">Price History</h4>
-                        <div className="h-[120px] relative bg-muted/20 rounded-lg">
-                          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-                            Historical price trends will be shown here
+                      {/* New Supply Exchange Card */}
+                      <Card className="mt-6">
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <CardTitle className="text-lg flex items-center gap-2">
+                                <RefreshCw className="h-5 w-5 text-blue-500" />
+                                Supply Exchange
+                              </CardTitle>
+                              <CardDescription>
+                                Publish your request to the internal supply exchange network
+                              </CardDescription>
+                            </div>
                           </div>
-                        </div>
-                      </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            <div className="flex items-start gap-4 p-4 bg-blue-50 rounded-lg">
+                              <div className="p-2 rounded-full bg-blue-100">
+                                <MessageSquareText className="h-5 w-5 text-blue-600" />
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="font-medium text-blue-900">Why publish to Supply Exchange?</h4>
+                                <p className="text-sm text-blue-700 mt-1">
+                                  Publishing your request allows other departments and facilities in your network to:
+                                </p>
+                                <ul className="mt-2 space-y-1 text-sm text-blue-700">
+                                  <li className="flex items-center gap-2">
+                                    <CheckCircle2 className="h-4 w-4 text-blue-500" />
+                                    Share surplus inventory
+                                  </li>
+                                  <li className="flex items-center gap-2">
+                                    <CheckCircle2 className="h-4 w-4 text-blue-500" />
+                                    Combine orders for better pricing
+                                  </li>
+                                  <li className="flex items-center gap-2">
+                                    <CheckCircle2 className="h-4 w-4 text-blue-500" />
+                                    Access pre-negotiated contracts
+                                  </li>
+                                </ul>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="text-sm text-muted-foreground">
+                                Your request will be visible to all members of your healthcare network
+                              </div>
+                              <Button className="gap-2">
+                                <RefreshCw className="h-4 w-4" />
+                                Publish Request
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
                     </div>
                   ) : (
                     <div className="space-y-4">
@@ -729,8 +1007,8 @@ export default function CreateOrderPage() {
   const router = useRouter()
   const { setRightActions } = useQuickActions()
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedItems, setSelectedItems] = useState<any[]>([])
-  const [selectedItem, setSelectedItem] = useState<any>(null)
+  const [selectedItems, setSelectedItems] = useState<OrderItem[]>([])
+  const [selectedItem, setSelectedItem] = useState<OrderItem | null>(null)
   const [isDetailsOverlayOpen, setIsDetailsOverlayOpen] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [loadingAlternatives, setLoadingAlternatives] = useState<{ [key: string]: boolean }>({})
@@ -747,13 +1025,6 @@ export default function CreateOrderPage() {
   const [selectedDeliveryTime, setSelectedDeliveryTime] = useState<string>("3-5 days")
   const [showFilters, setShowFilters] = useState(false)
   const filtersRef = useRef<HTMLDivElement>(null)
-  const [productFeedback] = useState<{ [key: string]: Feedback[] }>({
-    'default-feedback': [
-      { doctorName: "Dr. Smith", rating: 4.5, comment: "Excellent quality, would recommend", date: "2024-03-15" },
-      { doctorName: "Dr. Johnson", rating: 5, comment: "Best in class, very reliable", date: "2024-03-14" },
-      { doctorName: "Dr. Williams", rating: 4, comment: "Good product, slight delay in delivery", date: "2024-03-13" }
-    ]
-  })
   const [selectedVendorActions, setSelectedVendorActions] = useState<SelectedVendorAction[]>([])
   const [rfqItems, setRfqItems] = useState<RfqItem[]>([])
   const [rfqNotes, setRfqNotes] = useState<string>("")
@@ -763,7 +1034,12 @@ export default function CreateOrderPage() {
   const [sendStatus, setSendStatus] = useState<string | null>(null)
   const [csvItems, setCsvItems] = useState<any[]>([]);
   const [groupBy, setGroupBy] = useState<string>("none"); // State for grouping
-  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set()); // State for checkboxes
+  const [expandedItems, setExpandedItems] = useState<{ [key: string]: boolean }>({}); // State for expanded items
+  const [isAISuggestionsOverlayOpen, setIsAISuggestionsOverlayOpen] = useState(false)
+  const [aiSuggestedItems, setAiSuggestedItems] = useState<any[]>([])
+  const [loadingAISuggestions, setLoadingAISuggestions] = useState(false)
+  const [showRfqDialog, setShowRfqDialog] = useState(false)
+  const [isGeneratingRfq, setIsGeneratingRfq] = useState(false)
 
   // Payment terms options
   const paymentTermsOptions = ["Net 30", "Net 45", "Net 60"]
@@ -781,45 +1057,47 @@ export default function CreateOrderPage() {
     }, 800)
   }
 
-  const addItemToOrder = async (item: any) => {
+  // Update the getItemFromInventory function
+  const getItemFromInventory = (itemId: string): any => {
+    return inventoryData.find(item => item.id === itemId);
+  };
+
+  // Update the addItemToOrder function
+  const addItemToOrder = (item: InventoryItem) => {
     if (!selectedItems.some((i) => i.id === item.id)) {
-      // Add the item to selected items first
-      setSelectedItems([
-        ...selectedItems,
-        {
-          ...item,
-          quantity: 1,
-          selectedVendor: {
-            name: item.vendor,
-            price: item.unitPrice,
-            delivery: "3-5 days",
-            compliance: "Approved",
-          },
+      // Create vendor objects for all vendors in the array
+      const defaultVendor = item.vendors[0]; // Use first vendor as default
+      
+      const newItem: OrderItem = {
+        ...item,
+        quantity: 1,
+        vendors: item.vendors.map(v => ({
+          ...v,
+          status: {
+            isCurrentVendor: v === defaultVendor,
+            isSelected: v === defaultVendor
+          }
+        })),
+        selectedVendor: {
+          ...defaultVendor,
+          status: {
+            isCurrentVendor: true,
+            isSelected: true
+          }
         },
-      ])
-      // Clear search query and close suggestions
-      setSearchQuery("")
-
-      // Add immediate mockup alternatives instead of searching
-      setAlternativeVendors(prev => ({
-        ...prev,
-        [item.id]: MOCK_ALTERNATIVES.default.map(alt => {
-          const altPrice = parseFloat((item.unitPrice * (0.8 + Math.random() * 0.3)).toFixed(2));
-          return {
-            ...alt,
-            price: altPrice,
-            savings: Math.max(0, item.unitPrice - altPrice)
-          };
-        })
-      }));
-
-      // Add immediate AI recommendation
-      setAiRecommendations(prev => ({
-        ...prev,
-        [item.id]: "I've found several alternative vendors for this product. Cardinal Health offers the best value with potential savings of up to 20%. Medline provides faster delivery options."
-      }))
+        selectedVendorIds: [defaultVendor.id],
+        selectedVendors: [{
+          ...defaultVendor,
+          status: {
+            isCurrentVendor: true,
+            isSelected: true
+          }
+        }]
+      };
+      setSelectedItems((prevItems) => [...prevItems, newItem]);
+      setSearchQuery("");
     }
-  }
+  };
 
   const removeItemFromOrder = (itemId: string) => {
     setSelectedItems(selectedItems.filter((item) => item.id !== itemId))
@@ -833,141 +1111,39 @@ export default function CreateOrderPage() {
     return selectedItems.reduce((total, item) => total + (item.selectedVendor?.price || 0) * item.quantity, 0)
   }
 
-  const handleVendorSelect = (itemId: string, vendorId: string, vendor: Vendor) => {
-    setSelectedVendors(prev => {
-      const current = prev[itemId] || []
-      const updated = current.includes(vendorId)
-        ? current.filter(v => v !== vendorId)
-        : [...current, vendorId]
-      
-      // Update selected vendor actions
-      if (!current.includes(vendorId)) {
-        setSelectedVendorActions(prev => [...prev, { itemId, vendorId, vendor }])
-      } else {
-        setSelectedVendorActions(prev => prev.filter(action => action.vendorId !== vendorId))
-      }
-      
-      return { ...prev, [itemId]: updated }
-    })
-  }
-
-  const handleFindAlternatives = async (itemId: string) => {
+  const handleFindAlternatives = async (item: OrderItem) => {
     try {
-      setLoadingAlternatives(prev => ({ ...prev, [itemId]: true }))
+      // Simulate API call with mock data
+      const alternatives = MOCK_ALTERNATIVES.default.map(vendor => ({
+          ...vendor,
+        status: {
+          isCurrentVendor: vendor.id === item.currentVendor,
+          isSelected: vendor.id === item.selectedVendor?.id
+        }
+      }));
       
-      const searchResponse = await fetch('http://localhost:5001/api/run_search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: selectedItems.find(item => item.id === itemId)?.name || "",
-          websites: [
-            "heymedsupply.com",
-            "mfimedical.com",
-            "medline.com",
-            "cardinalhealth.com",
-            "mckesson.com",
-            "henryschein.com"
-          ]
-        })
-      })
-
-      if (!searchResponse.ok) {
-        throw new Error('Failed to search for alternatives')
-      }
-
-      const searchData = await searchResponse.json()
-      
-      // Transform the search results into the format we need and limit to 4 vendors
-      const alternatives = searchData.products
-        .slice(0, 4) // Limit to 4 vendors
-        .map((product: any) => ({
-          name: product.website,
-          productName: product.name,
-          price: parseFloat(product.price?.replace(/[^0-9.]/g, '') || '0'),
-          savings: null, // Will calculate after mapping
-          delivery: product.delivery || "--",
-          packaging: product.packaging || "--",
-          isSelected: false,
-          url: product.url,
-          image_url: product.image_url
-        }))
-
-      // If we have less than 2 alternatives, add placeholder alternatives
-      if (alternatives.length < 2) {
-        const placeholderVendors = [
-          {
-            name: "Medline",
-            productName: "Similar Product",
-            price: parseFloat((selectedItems.find(item => item.id === itemId)?.unitPrice * 0.9).toFixed(2)),
-            savings: null,
-            delivery: "3-5 days",
-            packaging: "Standard",
-            isSelected: false,
-            url: "#",
-            image_url: null
-          },
-          {
-            name: "Cardinal Health",
-            productName: "Similar Product",
-            price: parseFloat((selectedItems.find(item => item.id === itemId)?.unitPrice * 0.95).toFixed(2)),
-            savings: null,
-            delivery: "2-4 days",
-            packaging: "Standard",
-            isSelected: false,
-            url: "#",
-            image_url: null
-          },
-          {
-            name: "McKesson",
-            productName: "Similar Product",
-            price: parseFloat((selectedItems.find(item => item.id === itemId)?.unitPrice * 0.85).toFixed(2)),
-            savings: null,
-            delivery: "4-6 days",
-            packaging: "Standard",
-            isSelected: false,
-            url: "#",
-            image_url: null
-          }
-        ].slice(0, 2 - alternatives.length); // Only add what we need to reach 2 vendors
-
-        alternatives.push(...placeholderVendors);
-      }
-
-      // Calculate savings after mapping prices
-      const currentPrice = selectedItems.find(item => item.id === itemId)?.unitPrice || 0
-      alternatives.forEach((alt: Vendor) => {
-        alt.savings = alt.price ? (currentPrice - alt.price) : null
-      })
-
       setAlternativeVendors(prev => ({
         ...prev,
-        [itemId]: alternatives
-      }))
-
-      // Set AI recommendation with summary and price comparison
-      setAiRecommendations(prev => ({
-        ...prev,
-        [itemId]: searchData.summary + "\n\n" + (alternatives.length > 0 ? generatePriceComparison(currentPrice, alternatives) : "")
-      }))
+        [item.id]: alternatives
+      }));
     } catch (error) {
-      console.error('Error finding alternatives:', error)
-    } finally {
-      setLoadingAlternatives(prev => ({ ...prev, [itemId]: false }))
+      console.error('Error finding alternatives:', error);
     }
-  }
+  };
 
-  const generatePriceComparison = (currentPrice: number, alternatives: Vendor[]) => {
-    const bestPrice = Math.min(...alternatives.map(v => v.price || Infinity))
-    const bestSavings = currentPrice - bestPrice
+  // Helper function to generate realistic-looking AI recommendations
+  const generateAlternativesRecommendation = (currentPrice: number, alternatives: Vendor[]) => {
+    const bestPrice = Math.min(...alternatives.map(v => v.price || Infinity));
+    const bestSavings = currentPrice - bestPrice;
+    const bestVendor = alternatives.find(v => v.price === bestPrice);
     
     if (bestSavings > 0) {
-      const bestVendor = alternatives.find(v => v.price === bestPrice)
-      return `The best price is $${bestPrice.toFixed(2)} from ${bestVendor?.name}, which saves you $${bestSavings.toFixed(2)} per unit.`
+      const savingsPercent = Math.round((bestSavings / currentPrice) * 100);
+      return `I've found ${alternatives.length} alternative suppliers for this item. ${bestVendor?.name} offers the best price at $${bestPrice.toFixed(2)}, saving you $${bestSavings.toFixed(2)} per unit (${savingsPercent}% discount). ${bestVendor?.delivery} delivery is available, and they maintain a ${bestVendor?.qualityRating}/5 quality rating.`;
+    } else {
+      return `I've analyzed ${alternatives.length} alternative suppliers for this item. Your current price of $${currentPrice.toFixed(2)} appears to be competitive. I recommend checking for bulk discounts to further reduce your costs.`;
     }
-    return "The current price appears to be competitive. Consider bulk ordering for better rates."
-  }
+  };
 
   const renderStars = (rating: number) => {
     const stars = [];
@@ -988,81 +1164,86 @@ export default function CreateOrderPage() {
   };
 
   const handleGenerateRFQ = () => {
-    // Prepare data for the RFQ page
-    const rfqData = selectedVendorActions.map(action => {
-      // Find the full item details from selectedItems using the itemId from the action
-      const itemDetails = selectedItems.find(item => item.id === action.itemId);
-      
-      return {
-        itemId: action.itemId,
-        itemName: itemDetails?.name || 'Unknown Item', // Get name from selectedItems
-        itemSku: itemDetails?.sku || 'Unknown SKU', // Get SKU from selectedItems
-        quantity: itemDetails?.quantity || 0, // Get quantity from selectedItems
-        vendor: { // Pass relevant vendor details
-          id: action.vendor.id || action.vendorId, // Ensure vendor has an ID
-          name: action.vendor.name,
-          contactEmail: action.vendor.contactEmail,
-          contactPhone: action.vendor.contactPhone,
-          // Add other necessary vendor details if needed
-        }
-      };
-    }).filter(data => data.quantity > 0); // Ensure we only pass items with quantity
+    setShowRfqDialog(true);
+  };
 
-    if (rfqData.length === 0) {
-      console.warn("No valid items/vendors selected for RFQ.");
-      // Optionally show a user message/toast here
-      return;
-    }
+  const handleConfirmRFQ = async () => {
+    setIsGeneratingRfq(true);
+    
+    // Group by item first, then by vendor
+    const itemVendorMap = new Map();
+    
+    selectedVendorActions.forEach(action => {
+      if (!itemVendorMap.has(action.itemId)) {
+        const itemDetails = selectedItems.find(item => item.id === action.itemId);
+        itemVendorMap.set(action.itemId, {
+          itemDetails,
+          vendors: []
+        });
+      }
+      
+      const itemEntry = itemVendorMap.get(action.itemId);
+      itemEntry.vendors.push({
+        vendorId: action.vendorId,
+        vendorName: action.vendor.name,
+        vendorDetails: action.vendor
+      });
+    });
+    
+    // Create structured data for RFQ
+    const rfqData = {
+      id: `RFQ-${Date.now()}`,
+      created: new Date().toISOString(),
+      status: "Draft",
+      items: Array.from(itemVendorMap.entries()).map(([itemId, data]) => ({
+        id: itemId,
+        name: data.itemDetails?.name || 'Unknown Item',
+        sku: data.itemDetails?.sku || 'Unknown SKU',
+        quantity: data.itemDetails?.quantity || 0,
+        vendors: data.vendors
+      }))
+    };
 
     try {
-      // Store the prepared data in sessionStorage
-      sessionStorage.setItem('rfqDataForPreparation', JSON.stringify(rfqData));
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Navigate to the RFQ preparation page
-      router.push('/orders/create/rfq'); 
+      // Store for navigation to the RFQ page
+      sessionStorage.setItem('rfqDataForPreparation', JSON.stringify(rfqData));
+      setShowRfqDialog(false);
+      router.push('/orders/quotes/create');
     } catch (error) {
-        console.error("Error storing RFQ data or navigating:", error);
-        // Handle storage error (e.g., quota exceeded)
-        // Show an error message to the user
+      console.error('Error generating RFQ:', error);
+    } finally {
+      setIsGeneratingRfq(false);
     }
   };
 
   // Set up the right actions for the quick actions toolbar conditionally
   useEffect(() => {
     let rightActionContent: React.ReactNode = (
-      <Button
-        variant="ghost"
-        size="sm"
-        className="rounded-full bg-white text-black hover:bg-white/90 hover:text-black active:bg-white/80 flex items-center gap-2"
-      >
-        <FileUp className="h-4 w-4" />
-        <span>Upload File</span>
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="rounded-full bg-white text-black hover:bg-white/90 hover:text-black active:bg-white/80 flex items-center gap-2"
+          onClick={handleImportCSV}
+        >
+          <FileUp className="h-4 w-4" />
+          <span>Upload File</span>
+        </Button>
+        {selectedItems.length > 0 && (
+          <Button
+            size="sm"
+            className="gap-2"
+            onClick={handleGenerateRFQ}
+          >
+            <ShoppingCart className="h-4 w-4" />
+            Generate RFQ
+          </Button>
+        )}
+      </div>
     );
-
-    if (checkedItems.size > 0) {
-      rightActionContent = (
-        <Button
-          size="sm"
-          className="gap-2"
-          onClick={handleGenerateRFQ} // Assuming this function handles RFQ for checked items
-        >
-          <Mail className="h-4 w-4" />
-          Send RFQ ({checkedItems.size})
-        </Button>
-      );
-    } else if (selectedItems.length > 0) {
-      rightActionContent = (
-        <Button
-          size="sm"
-          className="gap-2"
-          onClick={handleGenerateRFQ} // Assuming this function handles RFQ for all selected items
-        >
-          <Mail className="h-4 w-4" />
-          Send RFQ ({selectedItems.length}) {/* Changed text to show total item count */}
-        </Button>
-      );
-    }
 
     setRightActions(rightActionContent);
 
@@ -1070,61 +1251,50 @@ export default function CreateOrderPage() {
     return () => {
       setRightActions(null);
     };
-  }, [setRightActions, selectedItems, checkedItems]); // Add dependencies
+  }, [setRightActions, selectedItems]);
 
-  const renderVendorOptions = (item: any) => {
-    const vendors = alternativeVendors[item.id] || [];
+  const renderVendorOptions = (item: InventoryItem) => {
+    const filteredVendors = item.vendors.filter(vendor => 
+      vendor.status.isSelected || vendor.status.isCurrentVendor
+    );
     
     return (
-      <div className="space-y-4">
-        <div className="grid gap-4">
-          {vendors.map((vendor: Vendor, index: number) => (
-            <div key={index} className="flex items-center gap-4 p-4 border rounded-lg bg-white">
-              <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center">
-                <img
-                  src={getVendorLogo(vendor.name)}
+      <div className="space-y-2">
+        {filteredVendors.map((vendor) => (
+          <div
+            key={vendor.id}
+            className={`p-2 rounded-lg border ${
+              vendor.status.isCurrentVendor
+                ? 'bg-blue-50 border-blue-200'
+                : vendor.status.isSelected
+                ? 'bg-green-50 border-green-200'
+                : 'bg-gray-50 border-gray-200'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                {vendor.image_url && (
+                  <img
+                    src={vendor.image_url}
                   alt={vendor.name}
-                  className="max-w-full max-h-full object-contain p-2"
-                  onError={(e) => {
-                    e.currentTarget.src = VENDOR_LOGOS.default;
-                  }}
+                    className="w-8 h-8 rounded-full object-cover"
                 />
+                )}
+                <span className="font-medium">{vendor.name}</span>
               </div>
-              {/* Rest of the vendor option content */}
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">{vendor.name}</div>
-                    <div className="text-sm text-muted-foreground">{vendor.productName}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-medium">${vendor.price?.toFixed(2)}</div>
-                    {vendor.savings !== null && vendor.savings > 0 && ( // Check for null before comparison
-                      <div className="text-sm text-green-600">Save ${vendor.savings.toFixed(2)}</div>
+              <div className="text-sm text-gray-600">
+                {vendor.price && (
+                  <span className="font-medium">${vendor.price.toFixed(2)}</span>
+                )}
+                {vendor.savings && vendor.savings > 0 && (
+                  <span className="ml-2 text-green-600">
+                    (Save ${vendor.savings.toFixed(2)})
+                  </span>
                     )}
                   </div>
                 </div>
-                <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Package className="h-4 w-4" />
-                    {vendor.packaging}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    {vendor.delivery}
-                  </div>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                className="ml-4"
-                onClick={() => handleVendorSelect(item.id, `${vendor.name}-${vendor.productName}`, vendor)}
-              >
-                Select
-              </Button>
             </div>
           ))}
-        </div>
       </div>
     );
   };
@@ -1316,737 +1486,168 @@ export default function CreateOrderPage() {
   }, [showFilters])
 
   const handleImportCSV = () => {
-    // Mock data for now - in real implementation, you would parse the actual CSV
-    const mockCsvItems = [
-      {
-        id: '1',
-        name: 'Set Irrigation Fluid Warming Single',
-        sku: '24750',
-        mfgrName: '3M HEALTHCARE',
-        mfgProdItem: '24750',
-        prodDesc: 'Set Irrigation Fluid Warming Single',
-        productAvailable: 'Y',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: '3M HEALTHCARE',
-        status: 'Normal'
-      },
-      {
-        id: '2',
-        name: 'Drape Surgical Transparent 23x33in Antimicrobial Incise loban 2 Sterile',
-        sku: '6651EZ',
-        mfgrName: '3M HEALTHCARE',
-        mfgProdItem: '6651EZ',
-        prodDesc: 'Drape Surgical Transparent 23x33in Antimicrobial Incise loban 2 Sterile',
-        productAvailable: 'Y',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: '3M HEALTHCARE',
-        status: 'Normal'
-      },
-      {
-        id: '3',
-        name: 'Bottle Feeding 2oz Plastic Pediatric w/Cap Similac Volu-Feed',
-        sku: '00180',
-        mfgrName: 'ABBOTI NUTRITION',
-        mfgProdItem: '00180',
-        prodDesc: 'Bottle Feeding 2oz Plastic Pediatric w/Cap Similac Volu-Feed',
-        productAvailable: '',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'ABBOTI NUTRITION',
-        status: 'Normal'
-      },
-      {
-        id: '4',
-        name: 'Formula Similac Water Sterilized 2oz Bottle RTF',
-        sku: '51000',
-        mfgrName: 'ABBOTI NUTRITION',
-        mfgProdItem: '51000',
-        prodDesc: 'Formula Similac Water Sterilized 2oz Bottle RTF',
-        productAvailable: '',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'ABBOTI NUTRITION',
-        status: 'Normal'
-      },
-      {
-        id: '5',
-        name: 'Tray Foley 16Fr Lubricath Drainage Bag Statlock Latex Advance',
-        sku: '899916',
-        mfgrName: 'BARD MEDICAL - A DIV OF BD',
-        mfgProdItem: '899916',
-        prodDesc: 'Tray Foley 16Fr Lubricath Drainage Bag Statlock Latex Advance',
-        productAvailable: '',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'BARD MEDICAL - A DIV OF BD',
-        status: 'Normal'
-      },
-      {
-        id: '6',
-        name: 'Tray Foley Urine Meter 16Fr 350ml Statlock Latex LubriCath',
-        sku: '902916',
-        mfgrName: 'BARD MEDICAL - A DIV OF BD',
-        mfgProdItem: '902916',
-        prodDesc: 'Tray Foley Urine Meter 16Fr 350ml Statlock Latex LubriCath',
-        productAvailable: '',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'BARD MEDICAL - A DIV OF BD',
-        status: 'Normal'
-      },
-      {
-        id: '7',
-        name: 'Tray Foley Urine Meter 18Fr 350ml Statlock Latex LubriCath',
-        sku: '902918',
-        mfgrName: 'BARD MEDICAL - A DIV OF BD',
-        mfgProdItem: '902918',
-        prodDesc: 'Tray Foley Urine Meter 18Fr 350ml Statlock Latex LubriCath',
-        productAvailable: '',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'BARD MEDICAL - A DIV OF BD',
-        status: 'Normal'
-      },
-      {
-        id: '8',
-        name: 'Tray Catheterization 16fr Urine Meter Outlet Tube Statlock Foley Advance LubriSil',
-        sku: '942216',
-        mfgrName: 'BARD MEDICAL - A DIV OF BD',
-        mfgProdItem: '942216',
-        prodDesc: 'Tray Catheterization 16fr Urine Meter Outlet Tube Statlock Foley Advance LubriSil',
-        productAvailable: '',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'BARD MEDICAL - A DIV OF BD',
-        status: 'Normal'
-      },
-      {
-        id: '9',
-        name: 'Tray Foley 14Fr IC Temp Sensing Urine Meter Statlock Complete Care Latex Advance',
-        sku: '319414AM',
-        mfgrName: 'BARD MEDICAL - A DIV OF BD',
-        mfgProdItem: '319414AM',
-        prodDesc: 'Tray Foley 14Fr IC Temp Sensing Urine Meter Statlock Complete Care Latex Advance',
-        productAvailable: '',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'BARD MEDICAL - A DIV OF BD',
-        status: 'Normal'
-      },
-      {
-        id: '10',
-        name: 'Tray Foley 16Fr IC Temp Sensing Urine Meter Statlock Complete Care Latex Advance',
-        sku: '319416AM',
-        mfgrName: 'BARD MEDICAL - A DIV OF BD',
-        mfgProdItem: '319416AM',
-        prodDesc: 'Tray Foley 16Fr IC Temp Sensing Urine Meter Statlock Complete Care Latex Advance',
-        productAvailable: '',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'BARD MEDICAL - A DIV OF BD',
-        status: 'Normal'
-      },
-      {
-        id: '11',
-        name: 'Solution IV Sterile Water for lnj 1000ml Viaflex Plastic Container',
-        sku: '280304X',
-        mfgrName: 'BAXTER HEALTHCARE',
-        mfgProdItem: '280304X',
-        prodDesc: 'Solution IV Sterile Water for lnj 1000ml Viaflex Plastic Container',
-        productAvailable: 'Y',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'BAXTER HEALTHCARE',
-        status: 'Normal'
-      },
-      {
-        id: '12',
-        name: 'Solution IV 0.9% Sodium Chloride lnj 50ml Viaflex',
-        sku: '281306',
-        mfgrName: 'BAXTER HEALTHCARE',
-        mfgProdItem: '281306',
-        prodDesc: 'Solution IV 0.9% Sodium Chloride lnj 50ml Viaflex',
-        productAvailable: 'Y',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'BAXTER HEALTHCARE',
-        status: 'Normal'
-      },
-      {
-        id: '13',
-        name: 'Solution IV 0.9% Sodium Chloride lnj 100ml Viaflex',
-        sku: '281307',
-        mfgrName: 'BAXTER HEALTHCARE',
-        mfgProdItem: '281307',
-        prodDesc: 'Solution IV 0.9% Sodium Chloride lnj 100ml Viaflex',
-        productAvailable: 'Y',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'BAXTER HEALTHCARE',
-        status: 'Normal'
-      },
-      {
-        id: '14',
-        name: 'Syringe 10ml Slip Tip',
-        sku: '303134',
-        mfgrName: 'BD MEDICAL - DIV OF BD WORLDWIDE',
-        mfgProdItem: '303134',
-        prodDesc: 'Syringe 10ml Slip Tip',
-        productAvailable: 'Y',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'BD MEDICAL - DIV OF BD WORLDWIDE',
-        status: 'Normal'
-      },
-      {
-        id: '15',
-        name: 'Syringe 50ml Luer-Lok Tip',
-        sku: '309653',
-        mfgrName: 'BD MEDICAL - DIV OF BD WORLDWIDE',
-        mfgProdItem: '309653',
-        prodDesc: 'Syringe 50ml Luer-Lok Tip',
-        productAvailable: 'Y',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'BD MEDICAL - DIV OF BD WORLDWIDE',
-        status: 'Normal'
-      },
-      {
-        id: '16',
-        name: 'Catheter Thoracic 28Fr x 20in Straight Argyle',
-        sku: '8888570549',
-        mfgrName: 'CARDINAL HEALTH INC',
-        mfgProdItem: '8888570549',
-        prodDesc: 'Catheter Thoracic 28Fr x 20in Straight Argyle',
-        productAvailable: 'Y',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: 'ship 7-10 days',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'CARDINAL HEALTH INC',
-        status: 'Normal'
-      },
-      {
-        id: '17',
-        name: 'Tube Culture 16ml Round Bottom Polystryrene Screw Cap Sterile',
-        sku: '352037',
-        mfgrName: 'CORNING INC',
-        mfgProdItem: '352037',
-        prodDesc: 'Tube Culture 16ml Round Bottom Polystryrene Screw Cap Sterile',
-        productAvailable: '',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'CORNING INC',
-        status: 'Normal'
-      },
-      {
-        id: '18',
-        name: 'Label Thermal Sunquest 4.1x1.2in 2-part Multicut 1800/rl',
-        sku: 'SUN0001',
-        mfgrName: 'DASCO LABEL',
-        mfgProdItem: 'SUN0001',
-        prodDesc: 'Label Thermal Sunquest 4.1x1.2in 2-part Multicut 1800/rl',
-        productAvailable: '',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'DASCO LABEL',
-        status: 'Normal'
-      },
-      {
-        id: '19',
-        name: 'Straw Flex 7.Sin Wrapped',
-        sku: 'NAS-420276',
-        mfgrName: 'INTERNATIONAL PAPER',
-        mfgProdItem: 'NAS-420276',
-        prodDesc: 'Straw Flex 7.Sin Wrapped',
-        productAvailable: '',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'INTERNATIONAL PAPER',
-        status: 'Normal'
-      },
-      {
-        id: '20',
-        name: 'Catheter Thoracic 28Fr Straight Taper Tip PVC Thermosensitive Atrium',
-        sku: '8028',
-        mfgrName: 'MAQUET INC - GETINGE GROUP',
-        mfgProdItem: '8028',
-        prodDesc: 'Catheter Thoracic 28Fr Straight Taper Tip PVC Thermosensitive Atrium',
-        productAvailable: '',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'MAQUET INC - GETINGE GROUP',
-        status: 'Normal'
-      },
-      {
-        id: '21',
-        name: 'Catheter Thoracic 28Fr Right Angle Taper Tip PVC Thermosensitive Atrium',
-        sku: '8128',
-        mfgrName: 'MAQUET INC - GETINGE GROUP',
-        mfgProdItem: '8128',
-        prodDesc: 'Catheter Thoracic 28Fr Right Angle Taper Tip PVC Thermosensitive Atrium',
-        productAvailable: '',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'MAQUET INC - GETINGE GROUP',
-        status: 'Normal'
-      },
-      {
-        id: '22',
-        name: 'Underpants Maternity L/XL Knit',
-        sku: 'MSC76400',
-        mfgrName: 'MEDLINE INDUSTRIES INC',
-        mfgProdItem: 'MSC76400',
-        prodDesc: 'Underpants Maternity L/XL Knit',
-        productAvailable: 'N',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: 'Cardinal brand MFR#705M',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'MEDLINE INDUSTRIES INC',
-        status: 'Normal'
-      },
-      {
-        id: '23',
-        name: 'Warmer Heel Infant Nonsterile',
-        sku: '989805603201',
-        mfgrName: 'PHILIPS HEALTHCARE',
-        mfgProdItem: '989805603201',
-        prodDesc: 'Warmer Heel Infant Nonsterile',
-        productAvailable: 'Y',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'PHILIPS HEALTHCARE',
-        status: 'Normal'
-      },
-      {
-        id: '24',
-        name: 'Kit Oral Care Suction Swab Perox-A-Mint Solution',
-        sku: '6513',
-        mfgrName: 'SAGE PRODUCTS LLC',
-        mfgProdItem: '6513',
-        prodDesc: 'Kit Oral Care Suction Swab Perox-A-Mint Solution',
-        productAvailable: 'Y',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'SAGE PRODUCTS LLC',
-        status: 'Normal'
-      },
-      {
-        id: '25',
-        name: 'Cannula Nasal Adult C02/02 Male Luer',
-        sku: '0538',
-        mfgrName: 'WESTMED - ACQ BY SUNMED',
-        mfgProdItem: '0538',
-        prodDesc: 'Cannula Nasal Adult C02/02 Male Luer',
-        productAvailable: 'N',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: 'McKesson MFR#16-0538',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'WESTMED - ACQ BY SUNMED',
-        status: 'Normal'
-      },
-      {
-        id: '26',
-        name: 'Pad Sanitary Maternity 3-3/4 x 1Oin Per-Pad',
-        sku: '1380A',
-        mfgrName: 'CARDINAL HEALTH INC',
-        mfgProdItem: '1380A',
-        prodDesc: 'Pad Sanitary Maternity 3-3/4 x 1Oin Per-Pad',
-        productAvailable: 'Y',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'CARDINAL HEALTH INC',
-        status: 'Normal'
-      },
-      {
-        id: '27',
-        name: 'Pad Nursing Sin Curity',
-        sku: '2630-',
-        mfgrName: 'CARDINAL HEALTH INC',
-        mfgProdItem: '2630-',
-        prodDesc: 'Pad Nursing Sin Curity',
-        productAvailable: 'Y',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'CARDINAL HEALTH INC',
-        status: 'Normal'
-      },
-      {
-        id: '28',
-        name: 'Electrode Fetal Scalp Single Helix Kendall',
-        sku: '31479549',
-        mfgrName: 'CARDINAL HEALTH INC',
-        mfgProdItem: '31479549',
-        prodDesc: 'Electrode Fetal Scalp Single Helix Kendall',
-        productAvailable: 'Y',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'CARDINAL HEALTH INC',
-        status: 'Normal'
-      },
-      {
-        id: '29',
-        name: 'Catheter Umbilical Vessel 3.SFr x 1Sin Single Lumen Polyurethan Argyle',
-        sku: '8888160333',
-        mfgrName: 'CARDINAL HEALTH INC',
-        mfgProdItem: '8888160333',
-        prodDesc: 'Catheter Umbilical Vessel 3.SFr x 1Sin Single Lumen Polyurethan Argyle',
-        productAvailable: 'Y',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: 'ship 7-10 days',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'CARDINAL HEALTH INC',
-        status: 'Normal'
-      },
-      {
-        id: '30',
-        name: 'Catheter Umbilical Vessel 5Fr x 1Sin Single Lumen Polyurethan Argyle',
-        sku: '8888160341',
-        mfgrName: 'CARDINAL HEALTH INC',
-        mfgProdItem: '8888160341',
-        prodDesc: 'Catheter Umbilical Vessel 5Fr x 1Sin Single Lumen Polyurethan Argyle',
-        productAvailable: '',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'CARDINAL HEALTH INC',
-        status: 'Normal'
-      },
-      {
-        id: '31',
-        name: 'Catheter Umbilical Vessel 5Fr x 1Sin Dual Lumen Polyurethan Argyle',
-        sku: '8888160556',
-        mfgrName: 'CARDINAL HEALTH INC',
-        mfgProdItem: '8888160556',
-        prodDesc: 'Catheter Umbilical Vessel 5Fr x 1Sin Dual Lumen Polyurethan Argyle',
-        productAvailable: '',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'CARDINAL HEALTH INC',
-        status: 'Normal'
-      },
-      {
-        id: '32',
-        name: 'Catheter Suction Neonatal 1OFr x 24in Replogle Argyle',
-        sku: '8888256503',
-        mfgrName: 'CARDINAL HEALTH INC',
-        mfgProdItem: '8888256503',
-        prodDesc: 'Catheter Suction Neonatal 1OFr x 24in Replogle Argyle',
-        productAvailable: '',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'CARDINAL HEALTH INC',
-        status: 'Normal'
-      },
-      {
-        id: '33',
-        name: 'Belt Fetal Monitor Tab 1.5x42in Pink and Blue Striped Kendall',
-        sku: '56102',
-        mfgrName: 'CARDINAL HEALTH INC',
-        mfgProdItem: '56102',
-        prodDesc: 'Belt Fetal Monitor Tab 1.5x42in Pink and Blue Striped Kendall',
-        productAvailable: 'Y',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'CARDINAL HEALTH INC',
-        status: 'Normal'
-      },
-      {
-        id: '34',
-        name: 'Detector Carbon Dioxide Adult Colorimetric Nellcor',
-        sku: 'EASYCAP II',
-        mfgrName: 'MEDTRONIC MITG',
-        mfgProdItem: 'EASYCAP II',
-        prodDesc: 'Detector Carbon Dioxide Adult Colorimetric Nellcor',
-        productAvailable: '',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'MEDTRONIC MITG',
-        status: 'Normal'
-      },
-      {
-        id: '35',
-        name: 'Syringe Oral Enteral Feeding 60ml Purple Monoject Sterile',
-        sku: '460S.E',
-        mfgrName: 'CARDINAL HEALTH INC',
-        mfgProdItem: '460S.E',
-        prodDesc: 'Syringe Oral Enteral Feeding 60ml Purple Monoject Sterile',
-        productAvailable: '',
-        itemsInCase: '',
-        caseMOQ: '',
-        casePrice: '',
-        priceIncludeShipping: '',
-        comment: '',
-        substitutionItem: '',
-        currentStock: 0,
-        totalStock: 0,
-        unitPrice: 0,
-        vendor: 'CARDINAL HEALTH INC',
-        status: 'Normal'
-      }
-    ];
+    // Transform inventory data to match the expected format for selected items
+    const importedItems = inventoryData.map(item => {
+      const defaultVendor = item.vendors[0];
+      return {
+        ...item,
+        quantity: 1,
+        vendors: item.vendors.map(v => ({
+          ...v,
+          status: {
+            isCurrentVendor: v === defaultVendor,
+            isSelected: v === defaultVendor
+          }
+        })),
+        selectedVendor: {
+          ...defaultVendor,
+          status: {
+            isCurrentVendor: true,
+            isSelected: true
+          }
+        },
+        selectedVendorIds: [defaultVendor.id],
+      selectedVendors: [{
+          ...defaultVendor,
+          status: {
+            isCurrentVendor: true,
+            isSelected: true
+          }
+        }]
+      };
+    });
     
-    setCsvItems(mockCsvItems);
-    setSelectedItems(mockCsvItems.map(item => ({ ...item, quantity: 1 }))); // Add quantity=1 for imported items
-    setCheckedItems(new Set()); // Reset checked items on import
+    setCsvItems(importedItems);
+    setSelectedItems(importedItems);
   };
 
-  const handleCheckAll = (isChecked: boolean) => {
-    if (isChecked) {
-      setCheckedItems(new Set(selectedItems.map(item => item.id)));
-    } else {
-      setCheckedItems(new Set());
+  const toggleItemExpansion = (itemId: string) => {
+    setExpandedItems(prev => ({
+      ...prev,
+      [itemId]: !prev[itemId]
+    }));
+  };
+
+  const handleVendorSelect = (itemId: string, vendorName: string, vendor: Vendor) => {
+    if (!selectedItem) return;
+
+    // Update local state first
+    const updatedVendors = selectedItem.vendors.map(v => ({
+      ...v,
+      status: {
+        ...v.status,
+        isSelected: v.id === vendor.id ? !v.status.isSelected : v.status.isSelected
+      }
+    }));
+
+    setSelectedItem({
+      ...selectedItem,
+      vendors: updatedVendors
+    });
+
+    // Update global state
+    setSelectedItems(prev => prev.map(item => {
+      if (item.id === itemId) {
+        return {
+          ...item,
+          vendors: updatedVendors,
+          ...(updatedVendors.find(v => v.id === vendor.id)?.status.isSelected ? {
+            selectedVendorIds: [...new Set([...(item.selectedVendorIds || []), vendor.id])],
+            selectedVendors: [...new Set([...(item.selectedVendors || []), vendor])]
+          } : {
+            selectedVendorIds: (item.selectedVendorIds || []).filter(id => id !== vendor.id),
+            selectedVendors: (item.selectedVendors || []).filter(v => v.id !== vendor.id)
+          })
+        };
+      }
+      return item;
+    }));
+
+    // Update the selectedVendors state
+    if (setSelectedVendors) {
+      setSelectedVendors(prev => {
+        const currentIds = prev[itemId] || [];
+        const isSelected = !currentIds.includes(vendor.id);
+        
+        return {
+          ...prev,
+          [itemId]: isSelected 
+            ? [...currentIds, vendor.id]
+            : currentIds.filter(id => id !== vendor.id)
+        };
+      });
+    }
+
+    // Update the selectedVendorActions state
+    if (setSelectedVendorActions) {
+      setSelectedVendorActions(prev => [
+        ...prev,
+        {
+          itemId,
+          vendorId: vendor.id,
+          vendor,
+          action: 'select'
+        }
+      ]);
     }
   };
 
-  const handleCheckItem = (itemId: string, isChecked: boolean) => {
-    setCheckedItems(prev => {
-      const newSet = new Set(prev);
-      if (isChecked) {
-        newSet.add(itemId);
-      } else {
-        newSet.delete(itemId);
-      }
-      return newSet;
-    });
+  // New function to add alternative vendors to the main item list
+  const handleAddAlternativeVendor = (itemId: string, vendorToAdd: Vendor) => {
+    setSelectedItems(prevItems => 
+      prevItems.map(item => {
+        if (item.id === itemId) {
+          // Check if vendor already exists
+          const vendorExists = item.selectedVendors.some(v => v.id === vendorToAdd.id || v.name === vendorToAdd.name);
+          if (!vendorExists) {
+            // Add the new vendor, ensuring isDefault is false
+            return {
+              ...item,
+              selectedVendors: [...item.selectedVendors, { ...vendorToAdd, isDefault: false, isSelected: false }]
+            };
+          }
+        }
+        return item;
+      })
+    );
+    // Optionally close the overlay or give feedback
+    // setIsDetailsOverlayOpen(false);
   };
 
-  const allItemsChecked = selectedItems.length > 0 && checkedItems.size === selectedItems.length;
-  const isIndeterminate = checkedItems.size > 0 && checkedItems.size < selectedItems.length;
+  // Add this function after the other handlers
+  const handleOpenAISuggestions = async () => {
+    try {
+      setLoadingAISuggestions(true)
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      // Generate mock AI suggested items based on recent activity
+      const suggestedItems = inventoryData
+        .filter(item => Math.random() > 0.7) // Randomly select some items
+        .map(item => ({
+          ...item,
+          reason: [
+            "Based on your recent orders",
+            "Similar to items you frequently purchase",
+            "Low stock alert",
+            "Price drop detected",
+            "New product available"
+          ][Math.floor(Math.random() * 5)]
+        }))
+      
+      setAiSuggestedItems(suggestedItems)
+      setIsAISuggestionsOverlayOpen(true)
+    } catch (error) {
+      console.error('Error loading AI suggestions:', error)
+    } finally {
+      setLoadingAISuggestions(false)
+    }
+  }
+
+  const handleAddSuggestedItem = (item: any) => {
+    addItemToOrder(item)
+    setAiSuggestedItems(prev => prev.filter(i => i.id !== item.id))
+  }
 
   return (
     <>
@@ -2106,40 +1707,7 @@ export default function CreateOrderPage() {
               {/* Search Card */}
               <Card>
                 <CardContent className="space-y-6">
-                  {/* AI Suggestions Section - Moved to top */}
-                  {showAISuggestions && (
-                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mt-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="p-1.5 bg-blue-100 rounded-full">
-                            <Sparkles className="h-4 w-4 text-blue-600" />
-                          </div>
-                          <div className="text-sm text-blue-800">
-                            We've found 2 items you might want to add based on your recent activity.
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            className="h-7 bg-white text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                            // Add onClick handler for Review button if needed
-                          >
-                            Review
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-blue-600 hover:text-blue-800 hover:bg-blue-100 h-8"
-                            onClick={() => setShowAISuggestions(false)}
-                          >
-                            Dismiss
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
+                  {/* Remove AI Suggestions Section */}
                   <div className="flex gap-2 mt-4">
                     <div className="relative flex-1">
                       <Search className="absolute left-4 top-4 h-5 w-5 text-muted-foreground" />
@@ -2151,18 +1719,9 @@ export default function CreateOrderPage() {
                       />
                     </div>
                     <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        className="gap-2"
-                        onClick={handleImportCSV}
-                      >
-                        <FileUp className="h-4 w-4" />
-                        Import CSV
-                      </Button>
                       <div className="relative" ref={filtersRef}>
                         <Button variant="outline" className="gap-2" onClick={() => setShowFilters(!showFilters)}>
                           <Filter className="h-4 w-4" />
-                          Risk
                         </Button>
                         {showFilters && (
                           <div className="absolute right-0 mt-2 w-[280px] rounded-lg border bg-white shadow-lg z-50 p-4 space-y-4">
@@ -2202,15 +1761,13 @@ export default function CreateOrderPage() {
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" className="gap-2">
-                            Group by: {groupBy === 'vendor' ? 'Vendor' : 'None'}
-                            <ChevronDown className="h-4 w-4" />
+                            <ArrowUpDown className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent className="w-56">
                           <DropdownMenuRadioGroup value={groupBy} onValueChange={setGroupBy}>
                             <DropdownMenuRadioItem value="none">None</DropdownMenuRadioItem>
                             <DropdownMenuRadioItem value="vendor">Vendor</DropdownMenuRadioItem>
-                            {/* Add other grouping options here */}
                           </DropdownMenuRadioGroup>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -2225,45 +1782,49 @@ export default function CreateOrderPage() {
                         </div>
                       ) : filteredItems.length > 0 ? (
                         <div className="divide-y">
-                          {filteredItems.slice(0, 5).map((item) => (
+                          {filteredItems.map((item) => (
                             <div 
                               key={item.id} 
-                              className="grid grid-cols-[auto,2fr,1fr,1fr,auto] items-center gap-4 p-4 hover:bg-muted/50 cursor-pointer"
+                              className="p-3 grid grid-cols-[auto,1fr,auto,auto,auto] gap-4 items-center hover:bg-muted/50 cursor-pointer"
                               onClick={() => addItemToOrder(item)}
                             >
-                              <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center">
+                              {/* Product Image */}
+                              <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center">
                                 <img
-                                  src={item.image || `/placeholder.svg?height=40&width=40`}
+                                  src={item.image || `/placeholder.svg?height=48&width=48`}
                                   alt={item.name}
-                                  className="max-w-full max-h-full object-contain"
+                                  className="max-w-full max-h-full object-contain p-1"
                                 />
                               </div>
                               
-                              <div>
+                              {/* Product Name */}
+                              <div className="min-w-[200px]">
                                 <div className="flex items-center gap-2">
-                                  <h4 className="font-medium">{item.name}</h4>
-                                  <Badge 
-                                    variant={item.status === "Urgent" ? "destructive" : item.status === "Low" ? "secondary" : "default"}
-                                    className="text-xs"
-                                  >
-                                    {item.status}
-                                  </Badge>
+                                  <span className="font-medium">{item.name}</span>
+                                  {item.status === "Urgent" && (
+                                    <Badge variant="destructive" className="h-5 px-1.5 py-0 text-xs font-normal">Urgent</Badge>
+                                  )}
                                 </div>
                                 <div className="text-sm text-muted-foreground">{item.sku}</div>
                               </div>
 
-                              <div className="text-sm">
+                              {/* Stock */}
+                              <div className="text-sm text-center">
                                 <div className="font-medium">{item.currentStock}/{item.totalStock}</div>
+                                <div className="text-muted-foreground">in stock</div>
                               </div>
 
-                              <div>
+                              {/* Supplier & Price */}
+                              <div className="text-right min-w-[150px]">
                                 <div className="font-medium">{item.vendor}</div>
                                 <div className="text-sm text-muted-foreground">${item.unitPrice.toFixed(2)} per unit</div>
                               </div>
 
+                              {/* Add Button */}
                               <Button
                                 size="sm"
                                 disabled={selectedItems.some((i) => i.id === item.id)}
+                                className="w-[80px]"
                               >
                                 {selectedItems.some((i) => i.id === item.id) ? "Added" : "Add"}
                               </Button>
@@ -2280,327 +1841,490 @@ export default function CreateOrderPage() {
 
                   {/* Selected Items Table */}
                   {selectedItems.length > 0 && (
-                    <div className="mt-6 overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[40px]">
-                              <Checkbox 
-                                checked={allItemsChecked || isIndeterminate}
-                                onCheckedChange={handleCheckAll}
-                                aria-label="Select all rows"
-                                {...(isIndeterminate && { 'data-state': 'indeterminate' })} // Handle indeterminate state correctly
-                              />
-                            </TableHead>
-                            <TableHead>Item</TableHead>
-                            <TableHead>Ratings</TableHead>
-                            <TableHead>Reviews</TableHead>
-                            <TableHead>SKU</TableHead>
-                            <TableHead>Manufacturer</TableHead>
-                            <TableHead>Mfg Product #</TableHead>
-                            <TableHead>Description</TableHead>
-                            <TableHead>Available</TableHead>
-                            <TableHead>Items/Case</TableHead>
-                            <TableHead>Case MOQ</TableHead>
-                            <TableHead>Case Price</TableHead>
-                            <TableHead>Shipping Included</TableHead>
-                            <TableHead>Comment</TableHead>
-                            <TableHead>Substitution</TableHead>
-                            <TableHead className="text-center">Stock</TableHead>
-                            {groupBy !== 'vendor' && <TableHead>Current Vendor</TableHead>} {/* Hide Vendor column when grouped */}
-                            <TableHead className="text-right">Unit Price</TableHead>
-                            <TableHead className="text-center">Potential Savings</TableHead>
-                            <TableHead className="w-[120px] text-center">Quantity</TableHead>
-                            <TableHead className="text-right">Total</TableHead>
-                            <TableHead className="w-[40px]">Action</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {groupBy === 'vendor' ? (
-                            Object.entries(
-                              selectedItems.reduce((groups, item) => {
-                                const vendor = item.vendor || 'Unknown Vendor';
-                                if (!groups[vendor]) {
-                                  groups[vendor] = [];
-                                }
-                                groups[vendor].push(item);
-                                return groups;
-                              }, {} as { [key: string]: any[] }) // Keep type assertion for accumulator
-                            ).map(([vendor, items]) => { // Let TS infer type here, then cast inside
-                              const vendorItems = items as any[]; // Cast to any[] to use array methods
-                              return (
-                                <React.Fragment key={vendor}>
-                                  <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                    {/* Empty cell for checkbox column in group header */}
-                                    <TableCell></TableCell> 
-                                    <TableCell colSpan={20} className="font-semibold"> {/* Adjust colSpan: 18 original + 2 new + 1 checkbox - 1 vendor = 20 */}
-                                      <div className="flex items-center gap-2">
-                                        <img
-                                          src={getVendorLogo(vendor)}
-                                          alt={vendor}
-                                          className="h-5 w-5 object-contain"
-                                          onError={(e) => {
-                                            e.currentTarget.src = VENDOR_LOGOS.default;
-                                          }}
-                                        />
-                                        {vendor} ({vendorItems.length} items)
-                                      </div>
-                                    </TableCell>
-                                  </TableRow>
-                                  {vendorItems.map((item: any) => ( // Use the casted array
-                                    <TableRow
-                                      key={item.id}
-                                      className="cursor-pointer hover:bg-muted/50"
-                                      onClick={() => {
-                                        setSelectedItem(item);
-                                        setIsDetailsOverlayOpen(true);
-                                      }}
-                                    >
-                                      <TableCell onClick={(e) => e.stopPropagation()} className="pl-4"> {/* Prevent row click on checkbox cell */}
-                                        <Checkbox 
-                                          checked={checkedItems.has(item.id)}
-                                          onCheckedChange={(checked) => handleCheckItem(item.id, !!checked)}
-                                          aria-label={`Select row ${item.id}`}
-                                        />
-                                      </TableCell>
-                                      <TableCell>
-                                        {/* Item Cell Content - WITHOUT feedback */}
+                    <div className="overflow-x-auto">
+                      <div className="min-w-[1400px]">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[400px]">Product Details</TableHead>
+                              <TableHead className="w-[140px]">SKU</TableHead>
+                              <TableHead className="w-[250px]">Vendor</TableHead>
+                              <TableHead className="w-[120px] text-center">Review</TableHead>
+                              <TableHead className="w-[120px] text-right">Unit Price</TableHead>
+                              <TableHead className="w-[100px] text-center">Quantity</TableHead>
+                              <TableHead className="w-[120px] text-right">Total</TableHead>
+                              <TableHead className="w-[150px]">Payment Terms</TableHead>
+                              <TableHead className="w-[150px]">Delivery Terms</TableHead>
+                              <TableHead className="w-[40px]">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {(() => {
+                              if (groupBy === "vendor") {
+                                // Group items by vendor
+                                const groupedItems = selectedItems.reduce<{ [key: string]: typeof selectedItems }>((acc, item) => {
+                                  // Get the vendor name from either the selected vendor or the first vendor in the vendors array
+                                  const vendorName = item.selectedVendor?.name || 
+                                                    (item.vendors && item.vendors[0]?.name) || 
+                                                    "Unassigned";
+                                  
+                                  if (!acc[vendorName]) {
+                                    acc[vendorName] = [];
+                                  }
+                                  acc[vendorName].push(item);
+                                  return acc;
+                                }, {});
+
+                                return Object.entries(groupedItems).map(([vendorName, items]) => (
+                                  <React.Fragment key={vendorName}>
+                                    {/* Vendor Group Header */}
+                                    <TableRow className="bg-muted/50">
+                                      <TableCell colSpan={10} className="py-2">
                                         <div className="flex items-center gap-2">
-                                          <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                          <div className="w-6 h-6 rounded-full bg-white border flex items-center justify-center">
                                             <img
-                                              src={item.image || `/placeholder.svg?height=32&width=32`}
-                                              alt={item.name}
-                                              className="max-w-full max-h-full object-contain"
+                                              src={getVendorLogo(vendorName)}
+                                              alt={vendorName}
+                                              className="w-full h-full object-contain p-1"
                                             />
                                           </div>
-                                          <div>
-                                            <div className="font-medium text-sm">{item.name}</div>
-                                            {/* Feedback removed from here */}
-                                          </div>
-                                        </div>
-                                      </TableCell>
-                                      <TableCell>
-                                        {/* Ratings Cell Content */}
-                                        <div className="flex">{renderStars(4.5)}</div>
-                                      </TableCell>
-                                      <TableCell>
-                                        {/* Reviews Cell Content */}
-                                        <div
-                                          className="flex items-center gap-1 cursor-pointer hover:opacity-80 text-xs text-blue-600"
-                                          onClick={(e) => { e.stopPropagation(); setShowFeedback(prev => ({ ...prev, [item.id]: !prev[item.id] }))}}
-                                        >
-                                          <MessageSquare className="h-3 w-3 mr-0.5" />
-                                          Hospital Feedback
-                                        </div>
-                                      </TableCell>
-                                      <TableCell className="text-muted-foreground">{item.sku}</TableCell>
-                                      <TableCell>{item.mfgrName}</TableCell>
-                                      <TableCell>{item.mfgProdItem}</TableCell>
-                                      <TableCell>{item.prodDesc}</TableCell>
-                                      <TableCell>{item.productAvailable}</TableCell>
-                                      <TableCell>{item.itemsInCase}</TableCell>
-                                      <TableCell>{item.caseMOQ}</TableCell>
-                                      <TableCell>{item.casePrice}</TableCell>
-                                      <TableCell>{item.priceIncludeShipping}</TableCell>
-                                      <TableCell>{item.comment}</TableCell>
-                                      <TableCell>{item.substitutionItem}</TableCell>
-                                      <TableCell className="text-center">
-                                        <div>{item.currentStock}/{item.totalStock}</div>
-                                      </TableCell>
-                                      {/* Vendor Cell is omitted when grouping by vendor */}
-                                      <TableCell className="text-right">${(item.unitPrice || 0).toFixed(2)}</TableCell>
-                                      <TableCell className="text-center">
-                                        {/* ... Potential Savings Cell Content ... */}
-                                        {alternativeVendors[item.id]?.length > 0 && (
-                                          <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
-                                            <TrendingDown className="h-3.5 w-3.5 mr-1" />
-                                            ${(item.unitPrice - Math.min(...alternativeVendors[item.id].map(v => v.price || Infinity))).toFixed(2)}
+                                          <span className="font-medium">{vendorName}</span>
+                                          <Badge variant="outline" className="ml-2">
+                                            {items.length} items
                                           </Badge>
-                                        )}
-                                      </TableCell>
-                                      <TableCell>
-                                        {/* ... Quantity Cell Content ... */}
-                                        <div className="flex items-center justify-center gap-1">
-                                          <Button
-                                            variant="outline"
-                                            size="icon"
-                                            className="h-8 w-8"
-                                            onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, Math.max(1, item.quantity - 1)); }}
-                                            disabled={item.quantity <= 1}
-                                          >
-                                            -
-                                          </Button>
-                                          <Input
-                                            type="number"
-                                            value={item.quantity}
-                                            onChange={(e) => updateItemQuantity(item.id, Number(e.target.value) || 1)}
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="h-8 w-12 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                          />
-                                          <Button
-                                            variant="outline"
-                                            size="icon"
-                                            className="h-8 w-8"
-                                            onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, item.quantity + 1); }}
-                                          >
-                                            +
-                                          </Button>
                                         </div>
-                                      </TableCell>
-                                      <TableCell className="text-right font-medium">
-                                        ${((item.unitPrice || 0) * item.quantity).toFixed(2)}
-                                      </TableCell>
-                                      <TableCell className="text-center">
-                                        {/* ... Action Cell Content ... */}
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-8 w-8 text-destructive"
-                                          onClick={(e) => { e.stopPropagation(); removeItemFromOrder(item.id); }}
-                                        >
-                                          <Trash2 className="h-4 w-4" />
-                                        </Button>
                                       </TableCell>
                                     </TableRow>
-                                  ))}
-                                </React.Fragment>
-                              )
-                            })
-                          ) : (
-                            selectedItems.map((item) => (
-                              <TableRow
-                                key={item.id}
-                                className="cursor-pointer hover:bg-muted/50"
-                                onClick={() => {
-                                  setSelectedItem(item);
-                                  setIsDetailsOverlayOpen(true);
-                                }}
-                              >
-                                <TableCell onClick={(e) => e.stopPropagation()} className="pl-4"> {/* Prevent row click on checkbox cell */}
-                                  <Checkbox 
-                                    checked={checkedItems.has(item.id)}
-                                    onCheckedChange={(checked) => handleCheckItem(item.id, !!checked)}
-                                    aria-label={`Select row ${item.id}`}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  {/* Item Cell Content - WITHOUT feedback */}
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                      <img
-                                        src={item.image || `/placeholder.svg?height=32&width=32`}
-                                        alt={item.name}
-                                        className="max-w-full max-h-full object-contain"
-                                      />
-                                    </div>
-                                    <div>
-                                      <div className="font-medium text-sm">{item.name}</div>
-                                      {/* Feedback removed from here */}
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  {/* Ratings Cell Content */}
-                                  <div className="flex">{renderStars(4.5)}</div>
-                                </TableCell>
-                                <TableCell>
-                                  {/* Reviews Cell Content */}
-                                  <div
-                                    className="flex items-center gap-1 cursor-pointer hover:opacity-80 text-xs text-blue-600"
-                                    onClick={(e) => { e.stopPropagation(); setShowFeedback(prev => ({ ...prev, [item.id]: !prev[item.id] }))}}
+                                    {/* Vendor Items */}
+                                    {items.map((item) => (
+                                      <React.Fragment key={item.id}>
+                                        <TableRow
+                                          className="cursor-pointer hover:bg-muted/50"
+                                          onClick={() => {
+                                            setSelectedItem(item);
+                                            setIsDetailsOverlayOpen(true);
+                                          }}
+                                        >
+                                          <TableCell>
+                                            <div className="flex items-center gap-3">
+                                              <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                                <img
+                                                  src={item.image || `/placeholder.svg?height=32&width=32`}
+                                                  alt={item.name}
+                                                  className="max-w-full max-h-full object-contain"
+                                                />
+                                              </div>
+                                              <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="font-medium text-sm">{item.name}</span>
+                                                  {item.status === "Urgent" && (
+                                                    <Badge variant="destructive" className="h-5 px-1.5 py-0 text-xs font-normal">Urgent</Badge>
+                                                  )}
+                                                </div>
+                                                <div className="text-sm text-muted-foreground line-clamp-2">
+                                                  {item.description}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </TableCell>
+                                          <TableCell>{item.sku}</TableCell>
+                                          <TableCell>
+                                            <div className="flex flex-wrap gap-2">
+                                              {item.vendors
+                                                .filter(vendor => vendor.status.isSelected || vendor.status.isCurrentVendor)
+                                                .map((vendor, index) => (
+                                                <div 
+                                                    key={`${item.id}-${vendor.name}`}
+                                                  className={`flex items-center gap-1.5 px-2 py-1 rounded-full border ${
+                                                      vendor.status.isCurrentVendor 
+                                                        ? "bg-blue-50 border-blue-200" 
+                                                        : vendor.status.isSelected
+                                                        ? "bg-primary/5 border-primary"
+                                                        : "bg-gray-50 border-gray-200"
+                                                  }`}
+                                                >
+                                                  <div className="relative h-4 w-4 rounded-full overflow-hidden border bg-white">
+                                                    <img
+                                                        src={vendor.image_url || getVendorLogo(vendor.name)}
+                                                      alt={vendor.name}
+                                                      className="w-full h-full object-contain p-0.5"
+                                                    />
+                                                  </div>
+                                                  <span className={`text-xs font-medium ${
+                                                      vendor.status.isCurrentVendor 
+                                                        ? "text-blue-700" 
+                                                        : vendor.status.isSelected
+                                                        ? "text-primary"
+                                                        : "text-gray-700"
+                                                  }`}>
+                                                    {vendor.name}
+                                                  </span>
+                                                </div>
+                                              ))}
+                                              {/* Add badge showing number of unselected vendors */}
+                                              {(() => {
+                                                const unselectedCount = item.vendors.filter(
+                                                  v => !v.status.isSelected && !v.status.isCurrentVendor
+                                                ).length;
+                                                if (unselectedCount > 0) {
+                                                  return (
+                                                    <div 
+                                                      className="flex items-center gap-1 px-2 py-1 rounded-full border border-dashed border-gray-300 bg-gray-50 cursor-pointer hover:bg-gray-100"
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedItem(item);
+                                                        setIsDetailsOverlayOpen(true);
+                                                      }}
+                                                    >
+                                                      <Plus className="h-3 w-3 text-gray-500" />
+                                                      <span className="text-xs text-gray-500 font-medium">
+                                                        {unselectedCount}
+                                                      </span>
+                                                    </div>
+                                                  );
+                                                }
+                                                return null;
+                                              })()}
+                                            </div>
+                                          </TableCell>
+                                          <TableCell className="text-center">
+                                            <div className="flex items-center justify-center gap-1">
+                                              <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
+                                              <span className="text-sm text-muted-foreground">4.5 (24)</span>
+                                            </div>
+                                          </TableCell>
+                                          <TableCell className="text-right">
+                                            ${item.unitPrice.toFixed(2)}
+                                          </TableCell>
+                                          <TableCell>
+                                            <Input
+                                              type="number"
+                                              min="1"
+                                              value={item.quantity || 1}
+                                              onChange={(e) => {
+                                                e.stopPropagation();
+                                                updateItemQuantity(item.id, Math.max(1, parseInt(e.target.value) || 1));
+                                              }}
+                                              onClick={(e) => e.stopPropagation()}
+                                              className="h-7 w-14 text-center"
+                                            />
+                                          </TableCell>
+                                          <TableCell className="text-right">
+                                            ${((item.quantity || 1) * item.unitPrice).toFixed(2)}
+                                          </TableCell>
+                                          <TableCell>{selectedPaymentTerms}</TableCell>
+                                          <TableCell>{selectedDeliveryTime}</TableCell>
+                                          <TableCell>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                removeItemFromOrder(item.id);
+                                              }}
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          </TableCell>
+                                        </TableRow>
+                                        {expandedItems[item.id] && (
+                                          <TableRow>
+                                            <TableCell colSpan={11} className="p-0 border-t-0">
+                                              <div className="p-4 bg-gray-50">
+                                                {/* Existing expanded content */}
+                                              </div>
+                                            </TableCell>
+                                          </TableRow>
+                                        )}
+                                      </React.Fragment>
+                                    ))}
+                                  </React.Fragment>
+                                ));
+                              }
+                              
+                              // Regular non-grouped view
+                              return selectedItems.map((item) => (
+                                <React.Fragment key={item.id}>
+                                  <TableRow
+                                    className="cursor-pointer hover:bg-muted/50"
+                                    onClick={() => {
+                                      setSelectedItem(item);
+                                      setIsDetailsOverlayOpen(true);
+                                    }}
                                   >
-                                    <MessageSquare className="h-3 w-3 mr-0.5" />
-                                    Hospital Feedback
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-muted-foreground">{item.sku}</TableCell>
-                                <TableCell>{item.mfgrName}</TableCell>
-                                <TableCell>{item.mfgProdItem}</TableCell>
-                                <TableCell>{item.prodDesc}</TableCell>
-                                <TableCell>{item.productAvailable}</TableCell>
-                                <TableCell>{item.itemsInCase}</TableCell>
-                                <TableCell>{item.caseMOQ}</TableCell>
-                                <TableCell>{item.casePrice}</TableCell>
-                                <TableCell>{item.priceIncludeShipping}</TableCell>
-                                <TableCell>{item.comment}</TableCell>
-                                <TableCell>{item.substitutionItem}</TableCell>
-                                <TableCell className="text-center">
-                                  <div>{item.currentStock}/{item.totalStock}</div>
-                                </TableCell>
-                                <TableCell>
-                                  {/* ... Vendor Cell Content ... */}
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded bg-gray-100 flex items-center justify-center">
-                                      <img
-                                        src={getVendorLogo(item.vendor)}
-                                        alt={item.vendor}
-                                        className="max-w-full max-h-full object-contain"
-                                        onError={(e) => {
-                                          e.currentTarget.src = VENDOR_LOGOS.default;
+                                    <TableCell>
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                          <img
+                                            src={item.image || `/placeholder.svg?height=32&width=32`}
+                                            alt={item.name}
+                                            className="max-w-full max-h-full object-contain"
+                                          />
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="flex items-center gap-2">
+                                            <span className="font-medium text-sm">{item.name}</span>
+                                            {item.status === "Urgent" && (
+                                              <Badge variant="destructive" className="h-5 px-1.5 py-0 text-xs font-normal">Urgent</Badge>
+                                            )}
+                                          </div>
+                                          <div className="text-sm text-muted-foreground line-clamp-2">
+                                            {item.description}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>{item.sku}</TableCell>
+                                    <TableCell>
+                                      <div className="flex flex-wrap gap-2">
+                                        {item.vendors
+                                          .filter(vendor => vendor.status.isSelected || vendor.status.isCurrentVendor)
+                                          .map((vendor, index) => (
+                                          <div 
+                                              key={`${item.id}-${vendor.name}`}
+                                            className={`flex items-center gap-1.5 px-2 py-1 rounded-full border ${
+                                                vendor.status.isCurrentVendor 
+                                                  ? "bg-blue-50 border-blue-200" 
+                                                  : vendor.status.isSelected
+                                                  ? "bg-primary/5 border-primary"
+                                                  : "bg-gray-50 border-gray-200"
+                                            }`}
+                                          >
+                                            <div className="relative h-4 w-4 rounded-full overflow-hidden border bg-white">
+                                              <img
+                                                  src={vendor.image_url || getVendorLogo(vendor.name)}
+                                                alt={vendor.name}
+                                                className="w-full h-full object-contain p-0.5"
+                                              />
+                                            </div>
+                                            <span className={`text-xs font-medium ${
+                                                vendor.status.isCurrentVendor 
+                                                  ? "text-blue-700" 
+                                                  : vendor.status.isSelected
+                                                  ? "text-primary"
+                                                  : "text-gray-700"
+                                            }`}>
+                                              {vendor.name}
+                                            </span>
+                                          </div>
+                                        ))}
+                                        {/* Add badge showing number of unselected vendors */}
+                                        {(() => {
+                                          const unselectedCount = item.vendors.filter(
+                                            v => !v.status.isSelected && !v.status.isCurrentVendor
+                                          ).length;
+                                          if (unselectedCount > 0) {
+                                            return (
+                                              <div 
+                                                className="flex items-center gap-1 px-2 py-1 rounded-full border border-dashed border-gray-300 bg-gray-50 cursor-pointer hover:bg-gray-100"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setSelectedItem(item);
+                                                  setIsDetailsOverlayOpen(true);
+                                                }}
+                                              >
+                                                <Plus className="h-3 w-3 text-gray-500" />
+                                                <span className="text-xs text-gray-500 font-medium">
+                                                  {unselectedCount}
+                                                </span>
+                                              </div>
+                                            );
+                                          }
+                                          return null;
+                                        })()}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
+                                        <span className="text-sm text-muted-foreground">4.5 (24)</span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      ${item.unitPrice.toFixed(2)}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        type="number"
+                                        min="1"
+                                        value={item.quantity || 1}
+                                        onChange={(e) => {
+                                          e.stopPropagation();
+                                          updateItemQuantity(item.id, Math.max(1, parseInt(e.target.value) || 1));
                                         }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="h-7 w-14 text-center"
                                       />
-                                    </div>
-                                    <span className="text-sm">{item.vendor}</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right">${(item.unitPrice || 0).toFixed(2)}</TableCell>
-                                <TableCell className="text-center">
-                                  {/* ... Potential Savings Cell Content ... */}
-                                  {alternativeVendors[item.id]?.length > 0 && (
-                                    <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
-                                      <TrendingDown className="h-3.5 w-3.5 mr-1" />
-                                      ${(item.unitPrice - Math.min(...alternativeVendors[item.id].map(v => v.price || Infinity))).toFixed(2)}
-                                    </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      ${((item.quantity || 1) * item.unitPrice).toFixed(2)}
+                                    </TableCell>
+                                    <TableCell>{selectedPaymentTerms}</TableCell>
+                                    <TableCell>{selectedDeliveryTime}</TableCell>
+                                    <TableCell>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          removeItemFromOrder(item.id);
+                                        }}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                  {expandedItems[item.id] && (
+                                    <TableRow>
+                                      <TableCell colSpan={11} className="p-0 border-t-0">
+                                        <div className="p-4 bg-gray-50">
+                                          {/* Existing expanded content */}
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
                                   )}
-                                </TableCell>
-                                <TableCell>
-                                  {/* ... Quantity Cell Content ... */}
-                                  <div className="flex items-center justify-center gap-1">
-                                    <Button
-                                      variant="outline"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, Math.max(1, item.quantity - 1)); }}
-                                      disabled={item.quantity <= 1}
-                                    >
-                                      -
-                                    </Button>
-                                    <Input
-                                      type="number"
-                                      value={item.quantity}
-                                      onChange={(e) => updateItemQuantity(item.id, Number(e.target.value) || 1)}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="h-8 w-12 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                    />
-                                    <Button
-                                      variant="outline"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={(e) => { e.stopPropagation(); updateItemQuantity(item.id, item.quantity + 1); }}
-                                    >
-                                      +
-                                    </Button>
+                                </React.Fragment>
+                              ));
+                            })()}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Separate Summary Section */}
+                  {selectedItems.length > 0 && (
+                    <div className="mt-6">
+                      <div className="grid gap-6 md:grid-cols-2">
+                        {/* Summary Statistics Card */}
+            <Card>
+              <CardHeader>
+                            <CardTitle>Order Summary</CardTitle>
+                            <CardDescription>Review your order details</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="border rounded-lg p-3">
+                                <div className="text-sm text-muted-foreground">Total Items</div>
+                                <div className="text-2xl font-semibold">{selectedItems.length}</div>
+                              </div>
+                              <div className="border rounded-lg p-3">
+                                <div className="text-sm text-muted-foreground">Total Vendors</div>
+                                <div className="text-2xl font-semibold">
+                                  {new Set(selectedItems.flatMap(item => 
+                                    item.vendors.filter(v => v.status.isSelected).map(v => v.name)
+                                  )).size}
+                                </div>
+                              </div>
+                              <div className="border rounded-lg p-3">
+                                <div className="text-sm text-muted-foreground">Total Quantity</div>
+                                <div className="text-2xl font-semibold">
+                                  {selectedItems.reduce((sum, item) => sum + (item.quantity || 0), 0)}
+                                </div>
+                              </div>
+                              <div className="border rounded-lg p-3">
+                                <div className="text-sm text-muted-foreground">Total Amount</div>
+                                <div className="text-2xl font-semibold">${calculateTotal().toFixed(2)}</div>
+                              </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="space-y-2 pt-4 border-t">
+                              <Button
+                                className="w-full justify-start gap-2" 
+                                onClick={handleGenerateRFQ}
+                              >
+                                <FileText className="h-4 w-4" />
+                                Create an RFQ
+                              </Button>
+                              <Button 
+                                className="w-full justify-start gap-2" 
+                                variant="outline"
+                                onClick={handleProceedToOrderConfirmation}
+                              >
+                                <ShoppingCart className="h-4 w-4" />
+                                Buy with AMS
+                              </Button>
+                              <Button
+                                className="w-full justify-start gap-2" 
+                                variant="outline"
+                                onClick={() => {/* TODO: Implement email functionality */}}
+                              >
+                                <Mail className="h-4 w-4" />
+                                Send Email
+                              </Button>
+                              <Button 
+                                className="w-full justify-start gap-2" 
+                                variant="outline"
+                                onClick={() => {/* TODO: Implement AI call functionality */}}
+                              >
+                                <PhoneCall className="h-4 w-4" />
+                                AI Call
+                              </Button>
+                            </div>
+              </CardContent>
+            </Card>
+
+                        {/* Actions and AI Analytics Card */}
+                        <Card>
+                          <CardHeader>
+                            <CardTitle>Actions & AI Insights</CardTitle>
+                            <CardDescription>Take action and view AI-powered recommendations</CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
+                              <div className="flex items-center gap-3 mb-4">
+                                <div className="p-1.5 bg-blue-100 rounded-full">
+                                  <Sparkles className="h-4 w-4 text-blue-600" />
+                                </div>
+                                <div className="text-sm text-blue-800">
+                                  We've found 2 items you might want to add based on your recent activity.
+                                </div>
+                              </div>
+
+                              <div className="space-y-3">
+                                <div className="flex items-start justify-between p-3 bg-white rounded-lg border border-blue-200">
+                                  <div>
+                                    <div className="font-medium text-blue-900">Cost Optimization</div>
+                                    <p className="text-sm text-blue-700 mt-1">
+                                      Potential savings of up to 15% by consolidating orders with AMS
+                                    </p>
                                   </div>
-                                </TableCell>
-                                <TableCell className="text-right font-medium">
-                                  ${((item.unitPrice || 0) * item.quantity).toFixed(2)}
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  {/* ... Action Cell Content ... */}
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-destructive"
-                                    onClick={(e) => { e.stopPropagation(); removeItemFromOrder(item.id); }}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
+                                  <Button size="sm" variant="outline" className="text-blue-600 border-blue-200">
+                                    View
                                   </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
+                                </div>
+
+                                <div className="flex items-start justify-between p-3 bg-white rounded-lg border border-blue-200">
+                                  <div>
+                                    <div className="font-medium text-blue-900">Compliance Check</div>
+                                    <p className="text-sm text-blue-700 mt-1">
+                                      All selected items meet regulatory requirements
+                                    </p>
+                                  </div>
+                                  <Button size="sm" variant="outline" className="text-blue-600 border-blue-200">
+                                    View
+                                  </Button>
+                                </div>
+
+                                <div className="flex items-start justify-between p-3 bg-white rounded-lg border border-blue-200">
+                                  <div>
+                                    <div className="font-medium text-blue-900">Similar Items</div>
+                                    <p className="text-sm text-blue-700 mt-1">
+                                      2 recommended items based on your order history
+                                    </p>
+                                  </div>
+                                  <Button size="sm" variant="outline" className="text-blue-600 border-blue-200">
+                                    Add
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+              </div>
                     </div>
                   )}
                 </CardContent>
@@ -2622,73 +2346,6 @@ export default function CreateOrderPage() {
             </Card>
           )}
         </div>
-
-        <AnimatePresence>
-          {selectedVendorActions.length > 0 && ( // Removed !showComparison condition
-            <motion.div
-              initial={{ y: 100, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 100, opacity: 0 }}
-              className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4 z-50"
-            >
-              <div className="container max-w-7xl mx-auto flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <span className="font-medium">
-                    {selectedVendorActions.length} vendor{selectedVendorActions.length > 1 ? 's' : ''} selected
-                  </span>
-                  <div className="flex -space-x-2">
-                    {selectedVendorActions.slice(0, 3).map((action, i) => (
-                      <div 
-                        key={action.vendorId}
-                        className="w-8 h-8 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center"
-                        style={{ zIndex: 3 - i }}
-                      >
-                        <span className="text-xs font-medium text-blue-700">
-                          {action.vendor.name.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                    ))}
-                    {selectedVendorActions.length > 3 && (
-                      <div 
-                        className="w-8 h-8 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center"
-                        style={{ zIndex: 0 }}
-                      >
-                        <span className="text-xs font-medium text-gray-600">
-                          +{selectedVendorActions.length - 3}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedVendorActions([])}
-                  >
-                    Clear Selection
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <Mail className="h-4 w-4" />
-                    Contact Vendors
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="gap-2"
-                    onClick={handleGenerateRFQ}
-                  >
-                    <FileUp className="h-4 w-4" />
-                    Create Request for Quote
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div> {/* Close main space-y-6 div */}
 
       {/* Quick Actions Toolbar - Will show 'Review Order' or 'Create RFQ' button */}
@@ -2698,12 +2355,264 @@ export default function CreateOrderPage() {
         isOpen={isDetailsOverlayOpen}
         onClose={() => setIsDetailsOverlayOpen(false)}
         item={selectedItem}
-        alternativeVendors={alternativeVendors}
+        alternativeVendors={alternativeVendors[selectedItem?.id] || []}
         setSelectedItems={setSelectedItems}
         handleFindAlternatives={handleFindAlternatives}
         loadingAlternatives={loadingAlternatives}
-        renderStars={renderStars} // Pass the function down
+        renderStars={renderStars}
+        selectedVendors={selectedVendors}
+        setSelectedVendors={setSelectedVendors}
+        setSelectedVendorActions={setSelectedVendorActions}
+        onAddAlternativeVendor={handleAddAlternativeVendor}
       />
+
+      {isAISuggestionsOverlayOpen && (
+        <AnimatePresence>
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 z-50"
+              onClick={() => setIsAISuggestionsOverlayOpen(false)}
+            />
+            
+            {/* Side Panel */}
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="fixed inset-y-0 right-0 w-[calc(100%-32px)] max-w-[900px] bg-white shadow-lg z-50"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="h-full flex flex-col">
+                {/* Header */}
+                <div className="p-4 border-b">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm text-muted-foreground">AI Suggestions</div>
+                      <div className="text-lg font-semibold">Recommended Items</div>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => setIsAISuggestionsOverlayOpen(false)} className="rounded-full">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Scrollable Content */}
+                <div className="flex-1 overflow-y-auto">
+                  <div className="p-6 space-y-6">
+                    {loadingAISuggestions ? (
+                      <div className="flex items-center justify-center h-32">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : aiSuggestedItems.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No suggestions available at this time.
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {aiSuggestedItems.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-start gap-4 p-4 border rounded-lg bg-white"
+                          >
+                            {/* Product Image */}
+                            <div className="w-24 h-24 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                              <img
+                                src={item.image || `/placeholder.svg`}
+                                alt={item.name}
+                                className="max-w-full max-h-full object-contain p-2"
+                              />
+                            </div>
+                            
+                            {/* Product Details */}
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <h3 className="font-medium">{item.name}</h3>
+                                  <p className="text-sm text-muted-foreground">{item.sku}</p>
+                                  <div className="mt-1 flex items-center gap-2">
+                                    <div className="flex items-center gap-1">
+                                      <Package className="h-4 w-4 text-muted-foreground" />
+                                      <span className="text-sm text-muted-foreground">{item.packaging}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                                      <span className="text-sm text-muted-foreground">{item.vendor}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="font-medium">${item.unitPrice?.toFixed(2)}</div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {item.currentStock}/{item.totalStock} in stock
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center justify-between">
+                                <div className="text-sm text-blue-600">
+                                  {item.reason}
+                                </div>
+                                <Button
+                                  onClick={() => handleAddSuggestedItem(item)}
+                                  className="bg-black text-white hover:bg-black/90"
+                                >
+                                  Add to Order
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        </AnimatePresence>
+      )}
+
+      {/* RFQ Confirmation Dialog */}
+      <AnimatePresence>
+        {showRfqDialog && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 z-[100]"
+              onClick={() => !isGeneratingRfq && setShowRfqDialog(false)}
+            />
+            
+            {/* Dialog */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              className="fixed left-[40%] top-[50px] translate-x-[-50%] translate-y-0 w-full max-w-2xl bg-white shadow-lg rounded-lg z-[101] overflow-y-auto max-h-[calc(100vh-100px)]"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-6 space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">Generate Request for Quotation</h3>
+                    <p className="text-sm text-muted-foreground">Review the details before proceeding</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full"
+                    onClick={() => !isGeneratingRfq && setShowRfqDialog(false)}
+                    disabled={isGeneratingRfq}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Order Summary */}
+                  <div className="space-y-2">
+                    <h4 className="font-medium">Order Summary</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="space-y-1">
+                        <div className="text-muted-foreground">Total Items</div>
+                        <div className="font-medium">{selectedItems.length} items</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-muted-foreground">Total Amount</div>
+                        <div className="font-medium">${calculateTotal().toFixed(2)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Selected Vendors */}
+                  <div className="space-y-2">
+                    <h4 className="font-medium">Selected Vendors</h4>
+                    <div className="border rounded-lg divide-y">
+                      {Array.from(new Set(selectedItems.flatMap(item => 
+                        item.vendors
+                          .filter(v => v.status.isSelected)
+                          .map(v => ({
+                            name: v.name,
+                            items: selectedItems.filter(i => 
+                              i.vendors.some(vendor => 
+                                vendor.status.isSelected && vendor.name === v.name
+                              )
+                            ).length
+                          }))
+                      ))).map((vendor, index) => (
+                        <div key={index} className="p-3 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                              <img
+                                src={getVendorLogo(vendor.name)}
+                                alt={vendor.name}
+                                className="w-full h-full object-contain p-1"
+                              />
+                            </div>
+                            <div>
+                              <div className="font-medium">{vendor.name}</div>
+                              <div className="text-sm text-muted-foreground">{vendor.items} items</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Terms & Conditions */}
+                  <div className="space-y-2">
+                    <h4 className="font-medium">Terms & Conditions</h4>
+                    <div className="text-sm space-y-2 text-muted-foreground">
+                      <p>By proceeding, you agree to:</p>
+                      <ul className="list-disc pl-5 space-y-1">
+                        <li>Share item specifications with selected vendors</li>
+                        <li>Allow vendors to submit quotes within 5 business days</li>
+                        <li>Maintain quote confidentiality</li>
+                        <li>Review and respond to quotes in a timely manner</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    onClick={() => !isGeneratingRfq && setShowRfqDialog(false)}
+                    disabled={isGeneratingRfq}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleConfirmRFQ}
+                    disabled={isGeneratingRfq}
+                    className="gap-2"
+                  >
+                    {isGeneratingRfq ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-4 w-4" />
+                        Generate RFQ
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   )
 }

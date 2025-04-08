@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { inventoryData } from '@/app/data/inventory-data'
+import { inventoryData } from '@/data/inventory-data'
 
 export async function GET(
   request: Request,

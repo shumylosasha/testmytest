@@ -9,6 +9,7 @@ import {
   Bell,
   X,
   ChevronLeft,
+  Mic,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useQuickActions } from "./quick-actions-context"
@@ -244,12 +245,26 @@ export function QuickActionsToolbar() {
           </div>
           <div className="p-3 border-t border-gray-200">
             <form onSubmit={handleAIChatSubmit} className="flex gap-2">
-              <Input
-                value={aiChatInput}
-                onChange={(e) => setAIChatInput(e.target.value)}
-                placeholder="Ask a question..."
-                className="flex-1 bg-white border-gray-200 text-gray-900 placeholder-gray-500 focus:border-primary"
-              />
+              <div className="flex-1 flex gap-2">
+                <Input
+                  value={aiChatInput}
+                  onChange={(e) => setAIChatInput(e.target.value)}
+                  placeholder="Ask a question..."
+                  className="flex-1 bg-white border-gray-200 text-gray-900 placeholder-gray-500 focus:border-primary"
+                />
+                <Button 
+                  type="button" 
+                  size="icon" 
+                  variant="ghost"
+                  className="h-10 w-10 shrink-0 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                  onClick={() => {
+                    // TODO: Implement voice input
+                    console.log("Voice input clicked")
+                  }}
+                >
+                  <Mic className="h-4 w-4" />
+                </Button>
+              </div>
               <Button type="submit" size="sm" className="bg-primary text-white hover:bg-primary/90">
                 Send
               </Button>

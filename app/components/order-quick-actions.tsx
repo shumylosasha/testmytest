@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   Bell,
   X,
+  Mic,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -230,10 +231,10 @@ export function OrderQuickActions({
 
       {/* AI Chat input with dark theme */}
       {showAIChat && (
-        <div className="absolute bottom-full mb-2 w-full max-w-2xl bg-gray-900 border border-gray-700 rounded-lg shadow-lg overflow-hidden text-gray-200">
-          <div className="flex items-center justify-between p-3 border-b border-gray-700">
-            <h4 className="font-medium">Chat with AI Assistant</h4>
-            <Button variant="ghost" size="icon" onClick={() => setShowAIChat(false)} className="text-gray-400 hover:bg-gray-800 hover:text-white">
+        <div className="absolute bottom-full mb-2 w-full max-w-2xl bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+          <div className="flex items-center justify-between p-3 border-b border-gray-200">
+            <h4 className="font-medium text-gray-900">Chat with AI Assistant</h4>
+            <Button variant="ghost" size="icon" onClick={() => setShowAIChat(false)} className="text-gray-500 hover:bg-gray-100 hover:text-gray-900">
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -241,7 +242,7 @@ export function OrderQuickActions({
             {aiChatMessages.map((msg, index) => (
               <div key={index} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} mb-2`}>
                 <div
-                  className={`flex gap-2 max-w-[80%] ${msg.role === "user" ? "bg-primary text-white" : "bg-gray-800 text-gray-200"} p-2 rounded-lg`}
+                  className={`flex gap-2 max-w-[80%] ${msg.role === "user" ? "bg-primary text-white" : "bg-gray-100 text-gray-900"} p-2 rounded-lg`}
                 >
                   {msg.role === "assistant" && <div className="h-5 w-5 mt-0.5 shrink-0 bg-primary rounded-full"></div>}
                   <div>
@@ -250,7 +251,7 @@ export function OrderQuickActions({
                       <Button
                         variant="outline"
                         size="sm"
-                        className="mt-2 h-7 text-xs border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
+                        className="mt-2 h-7 text-xs border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                         onClick={msg.action.onClick}
                       >
                         {msg.action.label}
@@ -261,22 +262,36 @@ export function OrderQuickActions({
               </div>
             ))}
           </div>
-          <div className="p-3 border-t border-gray-700">
+          <div className="p-3 border-t border-gray-200">
             <form onSubmit={handleAIChatSubmit} className="flex gap-2">
-              <Input
-                value={aiChatInput}
-                onChange={(e) => setAIChatInput(e.target.value)}
-                placeholder="Ask a question about your orders..."
-                className="flex-1 bg-gray-800 border-gray-700 text-gray-200 placeholder-gray-500 focus:border-primary"
-              />
-              <Button type="submit" size="sm">
+              <div className="flex-1 flex gap-2">
+                <Input
+                  value={aiChatInput}
+                  onChange={(e) => setAIChatInput(e.target.value)}
+                  placeholder="Ask a question about your orders..."
+                  className="flex-1 bg-white border-gray-200 text-gray-900 placeholder-gray-500 focus:border-primary"
+                />
+                <Button 
+                  type="button" 
+                  size="icon" 
+                  variant="ghost"
+                  className="h-10 w-10 shrink-0 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                  onClick={() => {
+                    // TODO: Implement voice input
+                    console.log("Voice input clicked")
+                  }}
+                >
+                  <Mic className="h-4 w-4" />
+                </Button>
+              </div>
+              <Button type="submit" size="sm" className="bg-primary text-white hover:bg-primary/90">
                 Send
               </Button>
             </form>
 
-            {/* Suggestions with dark theme */}
-            <div className="mt-3 pt-3 border-t border-gray-700">
-              <p className="text-xs text-gray-400 mb-2">Suggested questions:</p>
+            {/* Suggestions with light theme */}
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <p className="text-xs text-gray-500 mb-2">Suggested questions:</p>
               <div className="flex flex-wrap gap-2">
                 {[
                   "Track my orders",
@@ -289,7 +304,7 @@ export function OrderQuickActions({
                     key={index}
                     variant="outline"
                     size="sm"
-                    className="text-xs h-auto py-1 border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
+                    className="text-xs h-auto py-1 border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                     onClick={() => {
                       setAIChatInput(suggestion)
                     }}

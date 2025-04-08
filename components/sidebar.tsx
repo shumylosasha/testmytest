@@ -22,7 +22,7 @@ export default function Sidebar() {
     <div
       className={cn(
         "h-screen bg-white border-r transition-all duration-300 relative",
-        isOpen ? "w-[104px]" : "w-[104px]"
+        isOpen ? "w-[82px]" : "w-[82px]"
       )}
     >
       <div className="p-4 flex justify-center items-center">

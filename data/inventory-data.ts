@@ -1,73 +1,70 @@
-export type InventoryItem = {
-  id: string
-  name: string
-  sku: string
-  currentStock: number
-  totalStock: number
-  status: string
-  packaging: string
-  category: string
-  expiresIn: string
-  swaps: Array<{
-    id: string
-    name: string
-    sku: string
-    pricePerUnit: number
-    manufacturer: string
-    shipping: string
-    delivery: string
-    packaging: string
-    savings: number
-    vendor: string
-    compliance: string
-    vendor_image_url: string
-    image: string
-    url: string
-    notes: {
-      hospitalUsage?: string
-      recentPurchases?: string
-      priceTrend?: string
-      stockWarning?: string
-    }
-    feedback?: Array<{
-      hospitalName: string
-      rating: number
-      comment: string
-      date: string
-    }>
-  }>
-  potentialSavings: number
-  image: string
-  vendor_image_url: string
-  lastPurchasePrice: number
-  unitPrice: number
-  requiredUnits: number
-  vendor: string
-  manufacturer: string
+export interface Vendor {
+  id: string;
+  name: string;
+  pricePerUnit: number;
+  image_url?: string;
+  delivery: string;
+  packaging: string;
+  manufacturer: string;
+  shipping: string;
+  compliance: string;
+  url?: string;
+  notes?: {
+    hospitalUsage?: string;
+    recentPurchases?: string;
+    priceTrend?: string;
+    stockWarning?: string;
+  };
+  feedback?: Array<{
+    hospitalName: string;
+    rating: number;
+    comment: string;
+    date: string;
+  }>;
+  status: {
+    isCurrentVendor: boolean;
+    isSelected: boolean;
+  };
+  savings?: number;
+}
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  description: string;
+  sku: string;
+  currentStock: number;
+  totalStock: number;
+  status: string;
+  packaging: string;
+  category: string;
+  expiresIn: string;
+  image: string;
+  potentialSavings: number;
+  lastPurchasePrice: number;
+  unitPrice: number;
+  requiredUnits: number;
+  vendors: Vendor[];
+  selectedVendorIds: string[];
 }
 
 export async function getInventoryData(): Promise<InventoryItem[]> {
-  // Return the mockup data directly
-  return inventoryData as unknown as InventoryItem[];
+  return inventoryData;
 }
 
 export async function getInventoryItem(id: string): Promise<InventoryItem> {
-  // Find the item directly from the inventoryData array
   const item = inventoryData.find(item => item.id === id);
-  
   if (!item) {
     throw new Error('Inventory item not found');
   }
-  
-  // Convert the item to the expected type
-  // This is a workaround for the type mismatch
-  return item as unknown as InventoryItem;
+  return item;
 }
 
-export const inventoryData = [
+export const inventoryData: InventoryItem[] = [
   {
     id: "inv-001",
     name: "Surgical Gloves (Medium)",
+    description: "Latex-free surgical gloves designed for medium-sized hands, providing excellent tactile sensitivity and barrier protection",
     sku: "SG-M-100",
     currentStock: 75,
     totalStock: 100,
@@ -75,22 +72,28 @@ export const inventoryData = [
     packaging: "100/bx",
     category: "Surgical Supplies",
     expiresIn: "6 months",
-    swaps: [
+    potentialSavings: 11.0,
+    image: "https://m.media-amazon.com/images/I/61YO+aQShHL._AC_SY300_SX300_.jpg",
+    lastPurchasePrice: 0.23,
+    unitPrice: 0.23,
+    requiredUnits: 200,
+    selectedVendorIds: ["vendor-001"],
+    vendors: [
       {
-        id: "swap-001-1",
-        name: "Premium Surgical Gloves (Medium)",
-        sku: "PSG-M-100",
+        id: "vendor-001",
+        name: "MedSupply Inc.",
         pricePerUnit: 0.18,
         manufacturer: "MediGlove Pro",
         shipping: "2-3 days",
         delivery: "Next Day Available",
         packaging: "100/box, 10 boxes/case",
-        savings: 0.05,
-        vendor: "MedSupply Inc.",
-        compliance: "Approved",
-        vendor_image_url: "https://media.licdn.com/dms/image/v2/C4E0BAQEE_RxutRO_gQ/company-logo_200_200/company-logo_200_200/0/1630632059780/medsupplyinc_logo?e=2147483647&v=beta&t=v7QRWVsv2Iw55WSIY604LvS0lhYIxQZdo8cf2JzHSkw",
-        image: "https://m.media-amazon.com/images/I/61YO+aQShHL._AC_SY300_SX300_.jpg",
+        compliance: "Hospital Approved",
+        image_url: "https://media.licdn.com/dms/image/v2/C4E0BAQEE_RxutRO_gQ/company-logo_200_200/company-logo_200_200/0/1630632059780/medsupplyinc_logo?e=2147483647&v=beta&t=v7QRWVsv2Iw55WSIY604LvS0lhYIxQZdo8cf2JzHSkw",
         url: "https://medsupply.com/products/premium-surgical-gloves",
+        status: {
+          isCurrentVendor: true,
+          isSelected: true
+        },
         notes: {
           hospitalUsage: "Used by 85% of hospitals in your network",
           recentPurchases: "12 hospitals like yours bought this in last 5 months",
@@ -113,20 +116,21 @@ export const inventoryData = [
         ]
       },
       {
-        id: "swap-001-2",
-        name: "Economy Surgical Gloves (Medium)",
-        sku: "ESG-M-100",
+        id: "vendor-002",
+        name: "Discount Medical",
         pricePerUnit: 0.12,
         manufacturer: "ValueMed",
         shipping: "5-7 days",
         delivery: "Standard Ground",
         packaging: "100/box, 20 boxes/case",
-        savings: 0.11,
-        vendor: "Discount Medical",
-        compliance: "Approved",
-        vendor_image_url: "https://i.imgur.com/Q1ROACh.png",
-        image: "https://www.macgill.com/media/catalog/product/cache/1/image/9df78eab33525d08d6e5fb8d27136e95/2/0/2023_13136-50_2.jpg",
+        compliance: "Pending Review",
+        image_url: "https://i.imgur.com/Q1ROACh.png",
         url: "https://discountmedical.com/products/economy-surgical-gloves",
+        status: {
+          isCurrentVendor: false,
+          isSelected: false
+        },
+        savings: 0.11,
         notes: {
           hospitalUsage: "Used by 45% of hospitals in your network",
           recentPurchases: "8 hospitals like yours bought this in last 5 months",
@@ -141,320 +145,283 @@ export const inventoryData = [
             date: "2024-02-01"
           }
         ]
-      }
-    ],
-    potentialSavings: 11.0,
-    image: "https://m.media-amazon.com/images/I/61YO+aQShHL._AC_SY300_SX300_.jpg",
-    vendor_image_url: "https://media.licdn.com/dms/image/v2/C4E0BAQEE_RxutRO_gQ/company-logo_200_200/company-logo_200_200/0/1630632059780/medsupplyinc_logo?e=2147483647&v=beta&t=v7QRWVsv2Iw55WSIY604LvS0lhYIxQZdo8cf2JzHSkw",
-    lastPurchasePrice: 0.23,
-    unitPrice: 0.23,
-    requiredUnits: 200,
-    vendor: "MedSupply Inc.",
-    manufacturer: "MediGlove",
-  },
-  {
-    id: "inv-002",
-    name: "IV Catheters 20G",
-    sku: "IV-20G-50",
-    currentStock: 15,
-    totalStock: 100,
-    status: "Urgent",
-    packaging: "50/bx",
-    category: "IV Supplies",
-    expiresIn: "12 months",
-    swaps: [
-      {
-        id: "swap-002-1",
-        name: "Premium IV Catheters 20G",
-        sku: "PIV-20G-50",
-        pricePerUnit: 1.85,
-        manufacturer: "MediFlow Pro",
-        shipping: "1-2 days",
-        delivery: "Next Day Available",
-        packaging: "50/box, 10 boxes/case",
-        savings: 0.15,
-        vendor: "Hospital Direct",
-        compliance: "Approved",
-        vendor_image_url: "https://i.imgur.com/L5VqhbB.png",
-        image: "https://m.media-amazon.com/images/I/61YUYmYR1SL._AC_SL1500_.jpg",
-        url: "https://hospitaldirect.com/products/premium-iv-catheters",
-        notes: {
-          hospitalUsage: "Used by 92% of hospitals in your network",
-          recentPurchases: "15 hospitals purchased this month",
-          priceTrend: "Price stable for next quarter",
-          stockWarning: null
-        },
-        feedback: [
-          {
-            hospitalName: "Metro General",
-            rating: 4.8,
-            comment: "Excellent flow rate and patient comfort",
-            date: "2024-02-20"
-          }
-        ]
       },
       {
-        id: "swap-002-2",
-        name: "Value IV Catheters 20G",
-        sku: "VIV-20G-50",
-        pricePerUnit: 1.65,
-        manufacturer: "EcoMed",
-        shipping: "3-5 days",
-        delivery: "Standard Ground",
-        packaging: "50/box, 20 boxes/case",
-        savings: 0.35,
-        vendor: "MedSupply Inc.",
-        compliance: "Approved",
-        vendor_image_url: "https://media.licdn.com/dms/image/v2/C4E0BAQEE_RxutRO_gQ/company-logo_200_200/company-logo_200_200/0/1630632059780/medsupplyinc_logo?e=2147483647&v=beta&t=v7QRWVsv2Iw55WSIY604LvS0lhYIxQZdo8cf2JzHSkw",
-        image: "https://m.media-amazon.com/images/I/61YUYmYR1SL._AC_SL1500_.jpg",
-        url: "https://medsupply.com/products/value-iv-catheters",
-        notes: {
-          hospitalUsage: "Used by 45% of hospitals in your network",
-          recentPurchases: "Growing adoption rate",
-          priceTrend: "Bulk discounts available",
-          stockWarning: null
+        id: "vendor-003",
+        name: "Cardinal Health",
+        pricePerUnit: 0.22,
+        manufacturer: "Cardinal Health",
+        shipping: "1-2 days",
+        delivery: "Premium Express",
+        packaging: "100/box, 8 boxes/case",
+        compliance: "Hospital Approved",
+        image_url: "https://media.licdn.com/dms/image/C4D0BAQHfK4PHpB5N1w/company-logo_200_200/0/1630507620714/cardinal_health_logo?e=2147483647&v=beta&t=9Wd6DQNBQxjPnTqGfWm7lA7KFQogeAHmHcWXHfVtxGE",
+        url: "https://cardinalhealth.com/products/ultra-comfort-surgical-gloves",
+        status: {
+          isCurrentVendor: false,
+          isSelected: false
         },
-        feedback: [
-          {
-            hospitalName: "Community Health Center",
-            rating: 4.2,
-            comment: "Good quality for the price point",
-            date: "2024-02-10"
-          }
-        ]
-      }
-    ],
-    potentialSavings: 15.0,
-    image: "https://www.bbraunusa.com/content/dam/catalog/bbraun/bbraunProductCatalog/S/AEM2015/en-us/b218/introcan-safety-ivcathstraight20g.jpeg",
-    vendor_image_url: "https://i.imgur.com/L5VqhbB.png",
-    lastPurchasePrice: 2.0,
-    unitPrice: 2.0,
-    requiredUnits: 100,
-    vendor: "Hospital Direct",
-    manufacturer: "MediFlow",
-  },
-  {
-    id: "inv-003",
-    name: "Alcohol Prep Pads",
-    sku: "APP-200",
-    currentStock: 120,
-    totalStock: 200,
-    status: "Stock",
-    packaging: "200/bx",
-    category: "Cleaning Supplies",
-    expiresIn: "24 months",
-    swaps: [
-      {
-        id: "swap-003-1",
-        name: "Premium Alcohol Prep Pads",
-        sku: "PAPP-200",
-        pricePerUnit: 0.04,
-        manufacturer: "SterileClean Pro",
-        shipping: "2-3 days",
-        delivery: "Express Available",
-        packaging: "200/box, 25 boxes/case",
         savings: 0.01,
-        vendor: "MedSupply Inc.",
-        compliance: "Approved",
-        vendor_image_url: "https://media.licdn.com/dms/image/v2/C4E0BAQEE_RxutRO_gQ/company-logo_200_200/company-logo_200_200/0/1630632059780/medsupplyinc_logo?e=2147483647&v=beta&t=v7QRWVsv2Iw55WSIY604LvS0lhYIxQZdo8cf2JzHSkw",
-        image: "https://m.media-amazon.com/images/I/81YnWuJxPWL._AC_SL1500_.jpg",
-        url: "https://medsupply.com/products/premium-prep-pads",
         notes: {
-          hospitalUsage: "Most popular in your hospital network",
-          recentPurchases: "Consistent monthly orders",
-          priceTrend: "Volume discounts available",
-          stockWarning: null
-        },
-        feedback: [
-          {
-            hospitalName: "University Medical Center",
-            rating: 4.6,
-            comment: "Excellent saturation and durability",
-            date: "2024-02-18"
-          }
-        ]
-      },
-      {
-        id: "swap-003-2",
-        name: "Economy Alcohol Prep Pads",
-        sku: "EAPP-200",
-        pricePerUnit: 0.035,
-        manufacturer: "ValueMed",
-        shipping: "4-6 days",
-        delivery: "Standard Ground",
-        packaging: "200/box, 30 boxes/case",
-        savings: 0.015,
-        vendor: "Discount Medical",
-        compliance: "Approved",
-        vendor_image_url: "https://i.imgur.com/Q1ROACh.png",
-        image: "https://m.media-amazon.com/images/I/81YnWuJxPWL._AC_SL1500_.jpg",
-        url: "https://discountmedical.com/products/economy-prep-pads",
-        notes: {
-          hospitalUsage: "Growing adoption in smaller clinics",
-          recentPurchases: "Cost-effective alternative",
-          priceTrend: "Stable pricing",
-          stockWarning: null
-        },
-        feedback: [
-          {
-            hospitalName: "Regional Medical Center",
-            rating: 4.0,
-            comment: "Good for routine procedures",
-            date: "2024-02-05"
-          }
-        ]
-      }
-    ],
-    potentialSavings: 2.0,
-    image: "https://m.media-amazon.com/images/I/61fNptzgmJL._AC_SX679_.jpg",
-    vendor_image_url: "https://media.licdn.com/dms/image/v2/C4E0BAQEE_RxutRO_gQ/company-logo_200_200/company-logo_200_200/0/1630632059780/medsupplyinc_logo?e=2147483647&v=beta&t=v7QRWVsv2Iw55WSIY604LvS0lhYIxQZdo8cf2JzHSkw",
-    lastPurchasePrice: 0.05,
-    unitPrice: 0.05,
-    requiredUnits: 400,
-    vendor: "MedSupply Inc.",
-    manufacturer: "CleanMed",
-  },
-  {
-    id: "inv-004",
-    name: "Surgical Masks",
-    sku: "SM-50",
-    currentStock: 30,
-    totalStock: 100,
-    status: "Low",
-    packaging: "50/bx",
-    category: "PPE",
-    expiresIn: "36 months",
-    swaps: [
-      {
-        id: "swap-004-1",
-        name: "N95 Surgical Masks",
-        sku: "N95-SM-50",
-        pricePerUnit: 0.95,
-        manufacturer: "SafeBreath Pro",
-        shipping: "1-2 days",
-        delivery: "Next Day Available",
-        packaging: "50/box, 12 boxes/case",
-        savings: 0.0,
-        vendor: "PPE Direct",
-        compliance: "Approved",
-        vendor_image_url: "https://i.imgur.com/9KhJQWJ.png",
-        image: "https://m.media-amazon.com/images/I/71CgH69u67L._AC_SL1500_.jpg",
-        url: "https://ppedirect.com/products/n95-surgical-masks",
-        notes: {
-          hospitalUsage: "Standard in major hospitals",
-          recentPurchases: "High demand item",
-          priceTrend: "Premium quality option",
+          hospitalUsage: "Used by 72% of hospitals in your network",
+          recentPurchases: "15 hospitals like yours bought this in last 3 months",
+          priceTrend: "Premium quality, stable pricing",
           stockWarning: null
         },
         feedback: [
           {
             hospitalName: "Memorial Hospital",
-            rating: 4.9,
-            comment: "Excellent protection and comfort",
-            date: "2024-02-22"
-          }
-        ]
-      },
-      {
-        id: "swap-004-2",
-        name: "Standard Surgical Masks",
-        sku: "STD-SM-50",
-        pricePerUnit: 0.75,
-        manufacturer: "MediProtect",
-        shipping: "2-3 days",
-        delivery: "Standard Ground",
-        packaging: "50/box, 20 boxes/case",
-        savings: 0.2,
-        vendor: "MedSupply Inc.",
-        compliance: "Approved",
-        vendor_image_url: "https://media.licdn.com/dms/image/v2/C4E0BAQEE_RxutRO_gQ/company-logo_200_200/company-logo_200_200/0/1630632059780/medsupplyinc_logo?e=2147483647&v=beta&t=v7QRWVsv2Iw55WSIY604LvS0lhYIxQZdo8cf2JzHSkw",
-        image: "https://m.media-amazon.com/images/I/71CgH69u67L._AC_SL1500_.jpg",
-        url: "https://medsupply.com/products/standard-surgical-masks",
-        notes: {
-          hospitalUsage: "Popular in clinics and medical offices",
-          recentPurchases: "Cost-effective choice",
-          priceTrend: "Bulk discounts available",
-          stockWarning: null
-        },
-        feedback: [
+            rating: 4.8,
+            comment: "Superior comfort and sensitivity",
+            date: "2024-03-01"
+          },
           {
-            hospitalName: "City Medical Center",
-            rating: 4.3,
-            comment: "Good quality for routine use",
-            date: "2024-02-15"
-          }
-        ]
-      },
-      {
-        id: "swap-004-3",
-        name: "Economy Surgical Masks",
-        sku: "ECO-SM-50",
-        pricePerUnit: 0.65,
-        manufacturer: "ValueCare",
-        shipping: "4-6 days",
-        delivery: "Standard Ground",
-        packaging: "50/box, 40 boxes/case",
-        savings: 0.3,
-        vendor: "Discount Medical",
-        compliance: "Approved",
-        vendor_image_url: "https://i.imgur.com/Q1ROACh.png",
-        image: "https://m.media-amazon.com/images/I/71CgH69u67L._AC_SL1500_.jpg",
-        url: "https://discountmedical.com/products/economy-surgical-masks",
-        notes: {
-          hospitalUsage: "Suitable for visitor use",
-          recentPurchases: "High volume orders",
-          priceTrend: "Most economical option",
-          stockWarning: null
-        },
-        feedback: [
-          {
-            hospitalName: "Community Clinic",
-            rating: 4.0,
-            comment: "Basic protection at good price",
-            date: "2024-02-08"
+            hospitalName: "University Medical Center",
+            rating: 4.7,
+            comment: "Excellent grip and durability",
+            date: "2024-02-28"
           }
         ]
       }
-    ],
-    potentialSavings: 20.0,
-    image: "https://media.istockphoto.com/id/1206385911/uk/%D1%84%D0%BE%D1%82%D0%BE/%D0%BC%D0%B5%D0%B4%D0%B8%D1%87%D0%BD%D0%B0-%D0%BC%D0%B0%D1%81%D0%BA%D0%B0.jpg?s=612x612&w=0&k=20&c=PIvTRjOLW_fuVFMO05uhnC2D01dRf2y4891A-gpORII=",
-    vendor_image_url: "https://i.imgur.com/9KhJQWJ.png",
-    lastPurchasePrice: 0.95,
-    unitPrice: 0.95,
-    requiredUnits: 150,
-    vendor: "PPE Direct",
-    manufacturer: "SafeBreath",
+    ]
+  },
+  {
+    id: "inv-002",
+    name: "N95 Respirator Masks",
+    description: "NIOSH-approved N95 respirator masks providing superior protection against airborne particles",
+    sku: "N95-R-50",
+    currentStock: 120,
+    totalStock: 150,
+    status: "Low",
+    packaging: "50/bx",
+    category: "PPE",
+    expiresIn: "2 years",
+    potentialSavings: 70.0,
+    image: "https://multimedia.3m.com/mws/media/1425070P/3m-particulate-respirator-8210-n95.jpg",
+    lastPurchasePrice: 2.50,
+    unitPrice: 2.50,
+    requiredUnits: 200,
+    selectedVendorIds: ["vendor-004"],
+    vendors: [
+      {
+        id: "vendor-004",
+        name: "3M Medical",
+        pricePerUnit: 2.15,
+        manufacturer: "3M Healthcare",
+        shipping: "1-2 days",
+        delivery: "Express Available",
+        packaging: "50/box, 6 boxes/case",
+        compliance: "Hospital Approved",
+        image_url: "https://media.licdn.com/dms/image/C560BAQE88xCsONDULQ/company-logo_200_200/0/1630652622688/3m_logo?e=2147483647&v=beta&t=YN6gzPz9o8JrfJJh1Kj_L0YRJssJE_rbXVkM_6_V9kU",
+        url: "https://3m.com/products/n95-respirator",
+        status: {
+          isCurrentVendor: true,
+          isSelected: true
+        },
+        savings: 0.35,
+        notes: {
+          hospitalUsage: "Used by 92% of hospitals in your network",
+          recentPurchases: "15 hospitals like yours bought this in last 3 months",
+          priceTrend: "Price stable for next quarter",
+          stockWarning: "High demand item"
+        }
+      },
+      {
+        id: "vendor-005",
+        name: "Medline Industries",
+        pricePerUnit: 1.85,
+        manufacturer: "Kimberly-Clark",
+        shipping: "2-3 days",
+        delivery: "Standard Ground",
+        packaging: "50/box, 8 boxes/case",
+        compliance: "Hospital Approved",
+        image_url: "https://media.licdn.com/dms/image/C4E0BAQFKw0for7A7Qg/company-logo_200_200/0/1630507622157/medline_logo?e=2147483647&v=beta&t=Q8jZ8K8J8K8K8K8K8K8K8K8K8K8K8K8K8K8K8K8K8",
+        url: "https://medline.com/products/value-n95-respirator",
+        status: {
+          isCurrentVendor: false,
+          isSelected: false
+        },
+        savings: 0.65,
+        notes: {
+          hospitalUsage: "Used by 75% of hospitals in your network",
+          recentPurchases: "10 hospitals like yours bought this in last 2 months",
+          priceTrend: "Competitive pricing, bulk discounts available",
+          stockWarning: null
+        }
+      }
+    ]
+  },
+  {
+    id: "inv-003",
+    name: "Disposable Surgical Gowns",
+    description: "Level 3 barrier protection surgical gowns with reinforced critical zones",
+    sku: "DSG-L3-25",
+    currentStock: 45,
+    totalStock: 100,
+    status: "Urgent",
+    packaging: "25/pk",
+    category: "Surgical Supplies",
+    expiresIn: "3 years",
+    potentialSavings: 18.75,
+    image: "https://www.cardinalhealth.com/content/dam/corp/products/professional-products/ppe/surgical-gowns/cardinal-health-surgical-gown.png",
+    lastPurchasePrice: 5.50,
+    unitPrice: 5.50,
+    requiredUnits: 25,
+    selectedVendorIds: [],
+    vendors: [
+      {
+        id: "vendor-006",
+        name: "Cardinal Health",
+        pricePerUnit: 4.75,
+        manufacturer: "Cardinal Health",
+        shipping: "2-3 days",
+        delivery: "Standard",
+        packaging: "25/pack, 4 packs/case",
+        compliance: "Hospital Approved",
+        image_url: "https://media.licdn.com/dms/image/C4D0BAQHfK4PHpB5N1w/company-logo_200_200/0/1630507620714/cardinal_health_logo?e=2147483647&v=beta&t=9Wd6DQNBQxjPnTqGfWm7lA7KFQogeAHmHcWXHfVtxGE",
+        url: "https://cardinalhealth.com/products/surgical-gown-level-3",
+        status: {
+          isCurrentVendor: true,
+          isSelected: false
+        },
+        savings: 0.75,
+        notes: {
+          hospitalUsage: "Used by 78% of hospitals in your network",
+          recentPurchases: "10 hospitals like yours bought this in last 2 months",
+          priceTrend: "Price increase expected next quarter",
+          stockWarning: "Order soon - stock limited"
+        }
+      },
+      {
+        id: "vendor-007",
+        name: "Medline",
+        pricePerUnit: 3.95,
+        manufacturer: "Medline",
+        shipping: "3-4 days",
+        delivery: "Standard Ground",
+        packaging: "25/pack, 6 packs/case",
+        compliance: "Hospital Approved",
+        image_url: "https://media.licdn.com/dms/image/C4E0BAQFKw0for7A7Qg/company-logo_200_200/0/1630507622157/medline_logo?e=2147483647&v=beta&t=Q8jZ8K8J8K8K8K8K8K8K8K8K8K8K8K8K8K8K8K8K8",
+        url: "https://medline.com/products/economy-surgical-gown-level-3",
+        status: {
+          isCurrentVendor: false,
+          isSelected: false
+        },
+        savings: 1.55,
+        notes: {
+          hospitalUsage: "Used by 65% of hospitals in your network",
+          recentPurchases: "7 hospitals like yours bought this in last month",
+          priceTrend: "Stable pricing expected",
+          stockWarning: null
+        }
+      },
+      {
+        id: "vendor-008",
+        name: "Halyard Health",
+        pricePerUnit: 5.25,
+        manufacturer: "Halyard Health",
+        shipping: "1-2 days",
+        delivery: "Express Available",
+        packaging: "25/pack, 3 packs/case",
+        compliance: "Hospital Approved",
+        image_url: "https://www.mckesson.com/assets/img/mckesson-logo.svg",
+        url: "https://mckesson.com/products/ultra-protection-surgical-gown",
+        status: {
+          isCurrentVendor: false,
+          isSelected: false
+        },
+        savings: 0.25,
+        notes: {
+          hospitalUsage: "Used by 82% of hospitals in your network",
+          recentPurchases: "14 hospitals like yours bought this in last 3 months",
+          priceTrend: "Premium quality, stable pricing",
+          stockWarning: null
+        }
+      }
+    ]
+  },
+  {
+    id: "inv-004",
+    name: "IV Administration Sets",
+    description: "Primary IV sets with integrated safety features and precise flow control",
+    sku: "IV-SET-20",
+    currentStock: 200,
+    totalStock: 250,
+    status: "Stock",
+    packaging: "20/cs",
+    category: "IV Therapy",
+    expiresIn: "2 years",
+    potentialSavings: 10.0,
+    image: "https://www.bbraun.com/content/dam/catalog/bbraun/bbraunProductCatalog/S/AEM2015/en-01/b5/iv-administration-set.jpeg",
+    lastPurchasePrice: 3.75,
+    unitPrice: 3.75,
+    requiredUnits: 20,
+    selectedVendorIds: [],
+    vendors: [
+      {
+        id: "vendor-009",
+        name: "B. Braun Medical",
+        pricePerUnit: 3.25,
+        manufacturer: "B. Braun",
+        shipping: "2-3 days",
+        delivery: "Standard",
+        packaging: "20/case",
+        compliance: "Hospital Approved",
+        image_url: "https://media.licdn.com/dms/image/C4D0BAQFKw0for7A7Qg/company-logo_200_200/0/1630507622157/b_braun_logo?e=2147483647&v=beta&t=Q8jZ8K8J8K8K8K8K8K8K8K8K8K8K8K8K8K8K8K8K8",
+        url: "https://bbraun.com/products/iv-administration-set",
+        status: {
+          isCurrentVendor: true,
+          isSelected: false
+        },
+        notes: {
+          hospitalUsage: "Used by 65% of hospitals in your network",
+          recentPurchases: "8 hospitals like yours bought this in last month",
+          priceTrend: "Price stable",
+          stockWarning: null
+        }
+      }
+    ]
   },
   {
     id: "inv-005",
-    name: "Examination Gloves (Large)",
-    sku: "EG-L-100",
-    currentStock: 50,
-    totalStock: 100,
+    name: "Sterile Gauze Pads",
+    description: "4x4 inch sterile gauze pads, highly absorbent and lint-free",
+    sku: "SGP-4X4-200",
+    currentStock: 150,
+    totalStock: 200,
     status: "Stock",
-    packaging: "100/bx",
-    category: "Examination Supplies",
-    expiresIn: "12 months",
-    swaps: [
-      {
-        name: "Nitrile Examination Gloves (Large)",
-        pricePerUnit: 0.15,
-        manufacturer: "NitriCare",
-        shipping: "2-3 days",
-        savings: 0.03,
-        vendor: "MedSupply Inc.",
-        compliance: "Approved",
-        vendor_image_url: "https://media.licdn.com/dms/image/v2/C4E0BAQEE_RxutRO_gQ/company-logo_200_200/company-logo_200_200/0/1630632059780/medsupplyinc_logo?e=2147483647&v=beta&t=v7QRWVsv2Iw55WSIY604LvS0lhYIxQZdo8cf2JzHSkw"
-      },
-    ],
-    potentialSavings: 3.0,
-    image: "https://mederen.com/uploads/catalog/disposable_clothing/gloves/nitrile-gloves-02.jpg",
-    vendor_image_url: "https://media.licdn.com/dms/image/v2/C4E0BAQEE_RxutRO_gQ/company-logo_200_200/company-logo_200_200/0/1630632059780/medsupplyinc_logo?e=2147483647&v=beta&t=v7QRWVsv2Iw55WSIY604LvS0lhYIxQZdo8cf2JzHSkw",
-    lastPurchasePrice: 0.18,
-    unitPrice: 0.18,
+    packaging: "200/bx",
+    category: "Wound Care",
+    expiresIn: "5 years",
+    potentialSavings: 4.0,
+    image: "https://www.medline.com/media/catalog/product/cache/0b62cc35bf2e/N/O/NON21444_HRE_1.jpg",
+    lastPurchasePrice: 0.10,
+    unitPrice: 0.10,
     requiredUnits: 200,
-    vendor: "MedSupply Inc.",
-    manufacturer: "GloveCare",
-  },
-]
-
+    selectedVendorIds: [],
+    vendors: [
+      {
+        id: "vendor-010",
+        name: "Medline Industries",
+        pricePerUnit: 0.08,
+        manufacturer: "Medline",
+        shipping: "1-2 days",
+        delivery: "Next Day Available",
+        packaging: "200/box, 10 boxes/case",
+        compliance: "Hospital Approved",
+        image_url: "https://media.licdn.com/dms/image/C4E0BAQFKw0for7A7Qg/company-logo_200_200/0/1630507622157/medline_logo?e=2147483647&v=beta&t=Q8jZ8K8J8K8K8K8K8K8K8K8K8K8K8K8K8K8K8K8K8",
+        url: "https://medline.com/products/sterile-gauze-pads",
+        status: {
+          isCurrentVendor: true,
+          isSelected: false
+        },
+        notes: {
+          hospitalUsage: "Used by 88% of hospitals in your network",
+          recentPurchases: "14 hospitals like yours bought this in last 4 months",
+          priceTrend: "Bulk discounts available",
+          stockWarning: null
+        }
+      }
+    ]
+  }
+] 

@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Search, Filter, MoreHorizontal, Upload, Plus } from "lucide-react"
+import { Search, Filter, MoreHorizontal, Upload, Plus, Bot, X } from "lucide-react"
 import { inventoryData } from "@/data/inventory-data"
 import Link from "next/link"
 import { InventoryQuickActions } from "../components/inventory-quick-actions"
@@ -97,6 +97,20 @@ export default function InventoryPage() {
           </div>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex items-center gap-3 rounded-lg border border-blue-300 bg-blue-50/70 py-3 px-4">
+            <Bot className="h-5 w-5 text-blue-600" />
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                <p className="text-sm text-blue-900"><span className="font-bold text-blue-700">IV Catheters 20G</span> and <span className="font-bold text-blue-700">Surgical Masks</span> are running low and may need reordering based on seasonal trends.</p>
+                <Button variant="outline" size="sm" className="h-7 text-sm shrink-0 border-blue-300 bg-blue-100 text-blue-700 hover:bg-blue-200 hover:text-blue-900">
+                  View
+                </Button>
+              </div>
+            </div>
+            <Button variant="ghost" size="icon" className="h-5 w-5 -mr-2 text-blue-600 hover:text-blue-900 hover:bg-blue-100">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
           <div className="flex justify-between items-center mb-4">
             <div className="relative w-72">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
