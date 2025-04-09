@@ -22,13 +22,15 @@ import {
   Bot,
   RefreshCw,
 } from "lucide-react"
-import { getInventoryItem, type InventoryItem } from "@/data/inventory-data"
+import { getInventoryItem, type InventoryItem, Vendor } from "@/data/inventory-data"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { toast } from "sonner"
 import { InventoryItemQuickActions } from "../../components/inventory-item-quick-actions"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from "@/components/ui/table"
+import { notFound } from "next/navigation"
 
 // Add MarketTrend type
 type MarketTrend = {
@@ -63,13 +65,24 @@ type Alternative = {
   image: string | null
 }
 
+async function getItem(id: string): Promise<InventoryItem> {
+  try {
+    const item = await getInventoryItem(id)
+    if (!item) {
+      notFound()
+    }
+    return item
+  } catch (error) {
+    console.error("Error fetching item:", error)
+    notFound()
+  }
+}
+
 export default function InventoryItemPage() {
   const params = useParams()
   const router = useRouter()
   const id = params.id as string
   const [isSearching, setIsSearching] = useState(false)
-  const [searchResults, setSearchResults] = useState<Alternative[]>([])
-  const [searchData, setSearchData] = useState<{ summary: string; total_products: number; price_range: string } | null>(null)
   const [item, setItem] = useState<InventoryItem | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isResearchingMarket, setIsResearchingMarket] = useState(false)
@@ -100,56 +113,33 @@ export default function InventoryItemPage() {
 
   useEffect(() => {
     async function loadItem() {
+      setIsLoading(true)
       try {
-        const data = await getInventoryItem(id)
+        const data = await getItem(id)
         setItem(data)
       } catch (error) {
-        console.error('Failed to load item:', error)
-        toast.error('Failed to load inventory item')
+        console.error("Failed to load item:", error)
       } finally {
         setIsLoading(false)
       }
     }
-    loadItem()
+    if (id) {
+      loadItem()
+    }
   }, [id])
 
   const handleFindAlternatives = async () => {
     if (!item) return
 
     setIsSearching(true)
-    try {
-      // Instead of making an API call, use the item's swaps data directly
-      const alternatives: Alternative[] = (item.swaps || []).map((swap, index) => ({
-        vendor: swap.vendor || '',
-        name: swap.name || '',
-        productName: swap.name || '',
-        sku: swap.sku || '--',
-        pricePerUnit: swap.pricePerUnit || 0,
-        price: swap.pricePerUnit || 0,
-        savings: swap.savings || 0,
-        shipping: swap.shipping || '--',
-        manufacturer: swap.manufacturer || '--',
-        compliance: index === 0 ? 'Hospital Approved' : 
-                  index === 1 ? 'Pending Documentation' : 
-                  swap.compliance || 'Pending',
-        isSelected: false,
-        url: swap.url || '#',
-        image: swap.image || null
-      }));
-      
-      // Create mock search data
-      setSearchData({
-        summary: `Found ${alternatives.length} alternatives for ${item.name}`,
-        total_products: alternatives.length,
-        price_range: `$${Math.min(...alternatives.map(a => a.price))} - $${Math.max(...alternatives.map(a => a.price))}`
-      });
-      
-      setSearchResults(alternatives);
-    } catch (error) {
-      console.error('Search error:', error)
-    } finally {
-      setIsSearching(false)
-    }
+    console.log("Simulating finding alternatives for:", item.id)
+    // Simulate analysis time
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    // In a real app, this might trigger a backend analysis or simply rely
+    // on the data already present in alternativeVendors derived from item.vendors
+    console.log("Alternative analysis simulation complete.")
+    setIsSearching(false)
+    toast.info("Alternative vendor analysis complete.") // Provide feedback
   }
 
   const handleMarketResearch = async () => {
@@ -179,9 +169,8 @@ export default function InventoryItemPage() {
         price_forecast: "Expected to decrease by 3-5% in the next 6 months",
         key_manufacturers: ["MediGlove", "ValueMed", "SafetyFirst", "GlobalHealth Supplies"],
         last_updated: new Date().toISOString().split('T')[0]
-      };
-
-      setMarketIntelligence(mockMarketIntelligence);
+      }
+      setMarketIntelligence(mockMarketIntelligence)
     } catch (error) {
       console.error('Error researching market:', error)
       toast.error('Failed to get market intelligence')
@@ -251,6 +240,17 @@ export default function InventoryItemPage() {
       router.push("/inventory")
     }
   }
+
+  // Filter vendors to show as alternatives (e.g., not the current one)
+  const alternativeVendors = useMemo(() => {
+    if (!item) return []
+    return item.vendors.filter((v) => !v.status.isCurrentVendor)
+  }, [item])
+
+  // Calculate total potential savings from alternatives
+  const totalPotentialSavings = useMemo(() => {
+    return alternativeVendors.reduce((sum, vendor) => sum + (vendor.savings || 0), 0)
+  }, [alternativeVendors])
 
   if (isLoading) {
     return <div>Loading...</div>
@@ -382,7 +382,7 @@ export default function InventoryItemPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm text-muted-foreground">Supplier</p>
-                        <p className="font-medium">{item.vendor}</p>
+                        <p className="font-medium">{item.vendors[0]?.name ?? 'N/A'}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Contact</p>
@@ -390,7 +390,7 @@ export default function InventoryItemPage() {
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Manufacturer</p>
-                        <p className="font-medium">{item.manufacturer}</p>
+                        <p className="font-medium">{item.manufacturer ?? 'N/A'}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Reorder Point</p>
@@ -436,7 +436,7 @@ export default function InventoryItemPage() {
                     </div>
                     <div>
                         <p className="text-sm text-blue-900">
-                          I've analyzed the market for {item?.name} and found {item?.swaps.length} alternative vendors. The best option offers ${item?.potentialSavings.toFixed(2)} in potential savings per unit. Consider reviewing the alternatives below to optimize your procurement costs.
+                          We found {alternativeVendors.length} potential alternative vendors/products for {item.name}. The best option offers potential savings of up to ${Math.max(...alternativeVendors.map(v => v.savings || 0)).toFixed(2)} per unit. Total potential savings across alternatives: ${totalPotentialSavings.toFixed(2)}.
                         </p>
                       </div>
                     </div>
@@ -444,70 +444,72 @@ export default function InventoryItemPage() {
 
                   <CardContent>
                     <div className="space-y-4">
-                      {item?.swaps.map((swap, index) => (
-                        <div key={index} className="border rounded-lg p-4 animate-in fade-in slide-in-from-top-4 duration-500">
-                          <div className="flex gap-4">
-                            <div className="w-16 h-16 bg-gray-50 rounded flex items-center justify-center">
-                              <img
-                                src={
-                                  swap.name === "Premium Surgical Gloves (Medium)"
-                                    ? "https://encrypted-tbn3.gstatic.com/shopping?q=tbn:ANd9GcSuqK8wZkdEqlBFdPK6TXGQHlGtwSNd0xtP0iLsqWJ--Y9tp50LjDwaoGBsokfAFDJsBhMvfzJtO9PFGTee07DAIOGarbs_Fud-u-SsupbEtyCyw4X6C4e85W3Gy_Ld47knt8SdyxlH5A&usqp=CAc"
-                                    : swap.name === "Economy Surgical Gloves (Medium)"
-                                    ? "https://encrypted-tbn0.gstatic.com/shopping?q=tbn:ANd9GcRjs-4NrD53IAEtU7ZYpsQV__Zre3hG71hpRhiiIbynQANJZgn73O4om9fmLDlXGsL1uxYWeCOBN_8u3swkS5Hctal9A4BBuz7X_JLt7hxTwSltq7nzzWjD3ss9vzfPKDtyHfjZ09XDz4A&usqp=CAc"
-                                    : swap.image || "/placeholder.svg?height=64&width=64"
-                                }
-                                alt={swap.name}
-                                className="max-w-full max-h-full object-contain"
-                              />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-medium">{swap.name}</h4>
-                                {swap.savings > 0 && (
-                                  <Badge variant="outline" className="bg-green-50 text-green-700">
-                                    Save ${swap.savings.toFixed(2)}
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-sm">
-                                <div>
-                                  <span className="text-muted-foreground">Price:</span> ${swap.pricePerUnit.toFixed(2)}
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">Manufacturer:</span> {swap.manufacturer}
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">Shipping:</span> {swap.shipping}
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">Vendor:</span> {swap.vendor}
-                                </div>
-                                <div className="col-span-2">
-                                  <span className="text-muted-foreground">Compliance:</span>{" "}
-                                  <Badge variant="outline" className={`
-                                    ${swap.compliance === 'Hospital Approved' ? 'bg-green-50 text-green-700 border-green-200' : 
-                                      swap.compliance.includes('Pending') ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                      'bg-blue-50 text-blue-700 border-blue-200'}
-                                  `}>
-                                    {swap.compliance.includes('Pending') ? 'Pending Review' : swap.compliance}
-                                  </Badge>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 mt-3">
-                                <Button size="sm" className="bg-black text-white hover:bg-black/90">Create Order</Button>
-                                <Button size="sm" variant="outline" className="gap-1">
-                                  <Phone className="h-3 w-3" />
-                                  Call
-                                </Button>
-                                <Button size="sm" variant="outline" className="gap-1">
-                                  <Mail className="h-3 w-3" />
-                                  Email
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
+                      {alternativeVendors.length === 0 ? (
+                        <div className="text-center py-10 text-muted-foreground">
+                          {isSearching ? "Analyzing market..." : "No alternatives found or analysis not run."}
                         </div>
-                      ))}
+                      ) : (
+                        <div className="space-y-4">
+                          {alternativeVendors.map((vendor) => (
+                            <div key={vendor.id} className="border rounded-lg p-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                              <div className="flex gap-4">
+                                <div className="w-16 h-16 bg-gray-50 rounded flex items-center justify-center overflow-hidden">
+                                  <img
+                                    src={vendor.productImage || vendor.image_url || "/placeholder.svg?height=64&width=64"}
+                                    alt={vendor.productName || item.name}
+                                    className="max-w-full max-h-full object-contain"
+                                  />
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="font-medium">{vendor.productName || item.name}</h4>
+                                    {vendor.savings && vendor.savings > 0 && (
+                                      <Badge variant="outline" className="bg-green-50 text-green-700">
+                                        Save ${vendor.savings.toFixed(2)}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-sm">
+                                    <div>
+                                      <span className="text-muted-foreground">Price:</span> ${vendor.pricePerUnit.toFixed(2)}
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Manufacturer:</span> {vendor.manufacturer}
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Shipping:</span> {vendor.shipping}
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Vendor:</span> {vendor.name}
+                                    </div>
+                                    <div className="col-span-2">
+                                      <span className="text-muted-foreground">Compliance:</span>{" "}
+                                      <Badge variant="outline" className={`
+                                        ${vendor.compliance === 'Hospital Approved' ? 'bg-green-50 text-green-700 border-green-200' : 
+                                          vendor.compliance.includes('Pending') ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                          'bg-blue-50 text-blue-700 border-blue-200'}
+                                      `}>
+                                        {vendor.compliance.includes('Pending') ? 'Pending Review' : vendor.compliance}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-3">
+                                    <Button size="sm" className="bg-black text-white hover:bg-black/90">Create Order</Button>
+                                    <Button size="sm" variant="outline" className="gap-1">
+                                      <Phone className="h-3 w-3" />
+                                      Call
+                                    </Button>
+                                    <Button size="sm" variant="outline" className="gap-1">
+                                      <Mail className="h-3 w-3" />
+                                      Email
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -862,9 +864,9 @@ export default function InventoryItemPage() {
                 <div className="mt-4 pt-4 border-t">
                    <h4 className="font-medium mb-2">Key Manufacturers</h4>
                    <div className="flex flex-wrap gap-2">
-                     {item?.swaps.map((swap, i) => (
+                     {[...new Set(item.vendors.map(v => v.manufacturer))].map((manufacturer, i) => (
                        <Badge key={i} variant="secondary">
-                         {swap.manufacturer}
+                         {manufacturer}
                        </Badge>
                      ))}
                    </div>

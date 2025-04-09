@@ -13,7 +13,7 @@ export interface Vendor {
     hospitalUsage?: string;
     recentPurchases?: string;
     priceTrend?: string;
-    stockWarning?: string;
+    stockWarning?: string | null;
   };
   feedback?: Array<{
     hospitalName: string;
@@ -26,6 +26,9 @@ export interface Vendor {
     isSelected: boolean;
   };
   savings?: number;
+  productName?: string;
+  productSKU?: string;
+  productImage?: string | null;
 }
 
 export interface InventoryItem {
@@ -46,6 +49,7 @@ export interface InventoryItem {
   requiredUnits: number;
   vendors: Vendor[];
   selectedVendorIds: string[];
+  manufacturer?: string;
 }
 
 export async function getInventoryData(): Promise<InventoryItem[]> {
@@ -78,6 +82,7 @@ export const inventoryData: InventoryItem[] = [
     unitPrice: 0.23,
     requiredUnits: 200,
     selectedVendorIds: ["vendor-001"],
+    manufacturer: "MediGlove Pro",
     vendors: [
       {
         id: "vendor-001",
@@ -113,7 +118,10 @@ export const inventoryData: InventoryItem[] = [
             comment: "Best value for money",
             date: "2024-01-20"
           }
-        ]
+        ],
+        productName: "Surgical Gloves (Medium)",
+        productSKU: "SG-M-100",
+        productImage: "https://m.media-amazon.com/images/I/61YO+aQShHL._AC_SY300_SX300_.jpg"
       },
       {
         id: "vendor-002",
@@ -124,7 +132,7 @@ export const inventoryData: InventoryItem[] = [
         delivery: "Standard Ground",
         packaging: "100/box, 20 boxes/case",
         compliance: "Pending Review",
-        image_url: "https://i.imgur.com/Q1ROACh.png",
+        image_url: "https://www.discountmedicalca.com/wp-content/uploads/2023/10/DM-Logo-Square-transparent.png",
         url: "https://discountmedical.com/products/economy-surgical-gloves",
         status: {
           isCurrentVendor: false,
@@ -144,7 +152,10 @@ export const inventoryData: InventoryItem[] = [
             comment: "Good for basic procedures",
             date: "2024-02-01"
           }
-        ]
+        ],
+        productName: "Surgical Gloves (Medium)",
+        productSKU: "SG-M-100",
+        productImage: "https://m.media-amazon.com/images/I/61YO+aQShHL._AC_SY300_SX300_.jpg"
       },
       {
         id: "vendor-003",
@@ -155,7 +166,7 @@ export const inventoryData: InventoryItem[] = [
         delivery: "Premium Express",
         packaging: "100/box, 8 boxes/case",
         compliance: "Hospital Approved",
-        image_url: "https://media.licdn.com/dms/image/C4D0BAQHfK4PHpB5N1w/company-logo_200_200/0/1630507620714/cardinal_health_logo?e=2147483647&v=beta&t=9Wd6DQNBQxjPnTqGfWm7lA7KFQogeAHmHcWXHfVtxGE",
+        image_url: "https://logowik.com/content/uploads/images/cardinal-health9648.jpg",
         url: "https://cardinalhealth.com/products/ultra-comfort-surgical-gloves",
         status: {
           isCurrentVendor: false,
@@ -181,7 +192,10 @@ export const inventoryData: InventoryItem[] = [
             comment: "Excellent grip and durability",
             date: "2024-02-28"
           }
-        ]
+        ],
+        productName: "Surgical Gloves (Medium)",
+        productSKU: "SG-M-100",
+        productImage: "https://m.media-amazon.com/images/I/61YO+aQShHL._AC_SY300_SX300_.jpg"
       }
     ]
   },
@@ -197,11 +211,12 @@ export const inventoryData: InventoryItem[] = [
     category: "PPE",
     expiresIn: "2 years",
     potentialSavings: 70.0,
-    image: "https://multimedia.3m.com/mws/media/1425070P/3m-particulate-respirator-8210-n95.jpg",
+    image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSVzw7nGbIER75KJx_F8bbXOXrixzMfzFFlxw&s",
     lastPurchasePrice: 2.50,
     unitPrice: 2.50,
     requiredUnits: 200,
     selectedVendorIds: ["vendor-004"],
+    manufacturer: "3M Healthcare",
     vendors: [
       {
         id: "vendor-004",
@@ -212,7 +227,7 @@ export const inventoryData: InventoryItem[] = [
         delivery: "Express Available",
         packaging: "50/box, 6 boxes/case",
         compliance: "Hospital Approved",
-        image_url: "https://media.licdn.com/dms/image/C560BAQE88xCsONDULQ/company-logo_200_200/0/1630652622688/3m_logo?e=2147483647&v=beta&t=YN6gzPz9o8JrfJJh1Kj_L0YRJssJE_rbXVkM_6_V9kU",
+        image_url: "https://www.mpo-mag.com/wp-content/uploads/sites/7/2023/07/047_main.jpg",
         url: "https://3m.com/products/n95-respirator",
         status: {
           isCurrentVendor: true,
@@ -224,7 +239,10 @@ export const inventoryData: InventoryItem[] = [
           recentPurchases: "15 hospitals like yours bought this in last 3 months",
           priceTrend: "Price stable for next quarter",
           stockWarning: "High demand item"
-        }
+        },
+        productName: "N95 Respirator Masks",
+        productSKU: "N95-R-50",
+        productImage: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSVzw7nGbIER75KJx_F8bbXOXrixzMfzFFlxw&s"
       },
       {
         id: "vendor-005",
@@ -235,7 +253,7 @@ export const inventoryData: InventoryItem[] = [
         delivery: "Standard Ground",
         packaging: "50/box, 8 boxes/case",
         compliance: "Hospital Approved",
-        image_url: "https://media.licdn.com/dms/image/C4E0BAQFKw0for7A7Qg/company-logo_200_200/0/1630507622157/medline_logo?e=2147483647&v=beta&t=Q8jZ8K8J8K8K8K8K8K8K8K8K8K8K8K8K8K8K8K8K8",
+        image_url: "https://upload.wikimedia.org/wikipedia/en/thumb/8/89/Medline-logo.svg/1200px-Medline-logo.svg.png",
         url: "https://medline.com/products/value-n95-respirator",
         status: {
           isCurrentVendor: false,
@@ -247,7 +265,10 @@ export const inventoryData: InventoryItem[] = [
           recentPurchases: "10 hospitals like yours bought this in last 2 months",
           priceTrend: "Competitive pricing, bulk discounts available",
           stockWarning: null
-        }
+        },
+        productName: "N95 Respirator Masks",
+        productSKU: "N95-R-50",
+        productImage: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSVzw7nGbIER75KJx_F8bbXOXrixzMfzFFlxw&s"
       }
     ]
   },
@@ -263,11 +284,12 @@ export const inventoryData: InventoryItem[] = [
     category: "Surgical Supplies",
     expiresIn: "3 years",
     potentialSavings: 18.75,
-    image: "https://www.cardinalhealth.com/content/dam/corp/products/professional-products/ppe/surgical-gowns/cardinal-health-surgical-gown.png",
+    image: "https://www.duomed.com/sites/default/files/styles/full_screen/public/2024-01/HUPAN---Disposable-Surgical-Gowns_0.jpg?itok=8d_qZ-AY",
     lastPurchasePrice: 5.50,
     unitPrice: 5.50,
     requiredUnits: 25,
     selectedVendorIds: [],
+    manufacturer: "Cardinal Health",
     vendors: [
       {
         id: "vendor-006",
@@ -278,7 +300,7 @@ export const inventoryData: InventoryItem[] = [
         delivery: "Standard",
         packaging: "25/pack, 4 packs/case",
         compliance: "Hospital Approved",
-        image_url: "https://media.licdn.com/dms/image/C4D0BAQHfK4PHpB5N1w/company-logo_200_200/0/1630507620714/cardinal_health_logo?e=2147483647&v=beta&t=9Wd6DQNBQxjPnTqGfWm7lA7KFQogeAHmHcWXHfVtxGE",
+        image_url: "https://logowik.com/content/uploads/images/cardinal-health9648.jpg",
         url: "https://cardinalhealth.com/products/surgical-gown-level-3",
         status: {
           isCurrentVendor: true,
@@ -290,7 +312,10 @@ export const inventoryData: InventoryItem[] = [
           recentPurchases: "10 hospitals like yours bought this in last 2 months",
           priceTrend: "Price increase expected next quarter",
           stockWarning: "Order soon - stock limited"
-        }
+        },
+        productName: "Disposable Surgical Gowns",
+        productSKU: "DSG-L3-25",
+        productImage: "https://www.duomed.com/sites/default/files/styles/full_screen/public/2024-01/HUPAN---Disposable-Surgical-Gowns_0.jpg?itok=8d_qZ-AY"
       },
       {
         id: "vendor-007",
@@ -301,7 +326,7 @@ export const inventoryData: InventoryItem[] = [
         delivery: "Standard Ground",
         packaging: "25/pack, 6 packs/case",
         compliance: "Hospital Approved",
-        image_url: "https://media.licdn.com/dms/image/C4E0BAQFKw0for7A7Qg/company-logo_200_200/0/1630507622157/medline_logo?e=2147483647&v=beta&t=Q8jZ8K8J8K8K8K8K8K8K8K8K8K8K8K8K8K8K8K8K8",
+        image_url: "https://upload.wikimedia.org/wikipedia/en/thumb/8/89/Medline-logo.svg/1200px-Medline-logo.svg.png",
         url: "https://medline.com/products/economy-surgical-gown-level-3",
         status: {
           isCurrentVendor: false,
@@ -313,7 +338,10 @@ export const inventoryData: InventoryItem[] = [
           recentPurchases: "7 hospitals like yours bought this in last month",
           priceTrend: "Stable pricing expected",
           stockWarning: null
-        }
+        },
+        productName: "Disposable Surgical Gowns",
+        productSKU: "DSG-L3-25",
+        productImage: "https://www.duomed.com/sites/default/files/styles/full_screen/public/2024-01/HUPAN---Disposable-Surgical-Gowns_0.jpg?itok=8d_qZ-AY"
       },
       {
         id: "vendor-008",
@@ -324,7 +352,7 @@ export const inventoryData: InventoryItem[] = [
         delivery: "Express Available",
         packaging: "25/pack, 3 packs/case",
         compliance: "Hospital Approved",
-        image_url: "https://www.mckesson.com/assets/img/mckesson-logo.svg",
+        image_url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQNOn6KMEJNU8cEPCaRac5KUyTocvciF-HoZg&s",
         url: "https://mckesson.com/products/ultra-protection-surgical-gown",
         status: {
           isCurrentVendor: false,
@@ -336,7 +364,10 @@ export const inventoryData: InventoryItem[] = [
           recentPurchases: "14 hospitals like yours bought this in last 3 months",
           priceTrend: "Premium quality, stable pricing",
           stockWarning: null
-        }
+        },
+        productName: "Disposable Surgical Gowns",
+        productSKU: "DSG-L3-25",
+        productImage: "https://www.duomed.com/sites/default/files/styles/full_screen/public/2024-01/HUPAN---Disposable-Surgical-Gowns_0.jpg?itok=8d_qZ-AY"
       }
     ]
   },
@@ -352,11 +383,12 @@ export const inventoryData: InventoryItem[] = [
     category: "IV Therapy",
     expiresIn: "2 years",
     potentialSavings: 10.0,
-    image: "https://www.bbraun.com/content/dam/catalog/bbraun/bbraunProductCatalog/S/AEM2015/en-01/b5/iv-administration-set.jpeg",
+    image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSGTgrW2X8LU-cL9uhJRS3XSe0MYt_GtIGqMg&s",
     lastPurchasePrice: 3.75,
     unitPrice: 3.75,
     requiredUnits: 20,
     selectedVendorIds: [],
+    manufacturer: "B. Braun",
     vendors: [
       {
         id: "vendor-009",
@@ -367,7 +399,7 @@ export const inventoryData: InventoryItem[] = [
         delivery: "Standard",
         packaging: "20/case",
         compliance: "Hospital Approved",
-        image_url: "https://media.licdn.com/dms/image/C4D0BAQFKw0for7A7Qg/company-logo_200_200/0/1630507622157/b_braun_logo?e=2147483647&v=beta&t=Q8jZ8K8J8K8K8K8K8K8K8K8K8K8K8K8K8K8K8K8K8",
+        image_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Bbraun.svg/2560px-Bbraun.svg.png",
         url: "https://bbraun.com/products/iv-administration-set",
         status: {
           isCurrentVendor: true,
@@ -378,7 +410,10 @@ export const inventoryData: InventoryItem[] = [
           recentPurchases: "8 hospitals like yours bought this in last month",
           priceTrend: "Price stable",
           stockWarning: null
-        }
+        },
+        productName: "IV Administration Sets",
+        productSKU: "IV-SET-20",
+        productImage: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSGTgrW2X8LU-cL9uhJRS3XSe0MYt_GtIGqMg&s"
       }
     ]
   },
@@ -394,11 +429,12 @@ export const inventoryData: InventoryItem[] = [
     category: "Wound Care",
     expiresIn: "5 years",
     potentialSavings: 4.0,
-    image: "https://www.medline.com/media/catalog/product/cache/0b62cc35bf2e/N/O/NON21444_HRE_1.jpg",
+    image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSX6kJXim_WLbtUuCjol2cSqsJpWBUnaE1WeA&s",
     lastPurchasePrice: 0.10,
     unitPrice: 0.10,
     requiredUnits: 200,
     selectedVendorIds: [],
+    manufacturer: "Medline",
     vendors: [
       {
         id: "vendor-010",
@@ -409,7 +445,7 @@ export const inventoryData: InventoryItem[] = [
         delivery: "Next Day Available",
         packaging: "200/box, 10 boxes/case",
         compliance: "Hospital Approved",
-        image_url: "https://media.licdn.com/dms/image/C4E0BAQFKw0for7A7Qg/company-logo_200_200/0/1630507622157/medline_logo?e=2147483647&v=beta&t=Q8jZ8K8J8K8K8K8K8K8K8K8K8K8K8K8K8K8K8K8K8",
+        image_url: "https://upload.wikimedia.org/wikipedia/en/thumb/8/89/Medline-logo.svg/1200px-Medline-logo.svg.png",
         url: "https://medline.com/products/sterile-gauze-pads",
         status: {
           isCurrentVendor: true,
@@ -420,7 +456,10 @@ export const inventoryData: InventoryItem[] = [
           recentPurchases: "14 hospitals like yours bought this in last 4 months",
           priceTrend: "Bulk discounts available",
           stockWarning: null
-        }
+        },
+        productName: "Sterile Gauze Pads",
+        productSKU: "SGP-4X4-200",
+        productImage: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSX6kJXim_WLbtUuCjol2cSqsJpWBUnaE1WeA&s"
       }
     ]
   }

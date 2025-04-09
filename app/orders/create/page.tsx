@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, FileUp, Loader2, Plus, Search, Trash2, TrendingDown, BookOpen, RefreshCw, ExternalLink, Sparkles, Star, StarHalf, MessageSquare, Mail, ChevronDown, MessageSquareText, Scale, Building2, History, AlertTriangle, FileText, ShoppingCart, BookmarkPlus, Package, DollarSign, X, ChevronRight, CheckCircle2, Clock, CheckCircle, PhoneCall, Filter, XCircle, ShieldCheck, ArrowUpDown, Minus, Truck } from "lucide-react"
+import { ChevronLeft, FileUp, Loader2, Plus, Search, Trash2, TrendingDown, BookOpen, RefreshCw, ExternalLink, Sparkles, Star, StarHalf, MessageSquare, Mail, ChevronDown, MessageSquareText, Scale, Building2, History, AlertTriangle, FileText, ShoppingCart, BookmarkPlus, Package, DollarSign, X, ChevronRight, CheckCircle2, Clock, CheckCircle, PhoneCall, Filter, XCircle, ShieldCheck, ArrowUpDown, Minus, Truck, Box, Users, ClipboardList, AlertCircle } from "lucide-react"
 import { inventoryData } from "@/data/inventory-data"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
@@ -32,7 +32,7 @@ import { ordersData, type Order } from "@/data/orders-data"
 import Image from "next/image"
 
 interface Feedback {
-  doctorName: string;
+  hospitalName: string; // Keep hospitalName
   rating: number;
   comment: string;
   date: string;
@@ -42,26 +42,28 @@ interface Vendor {
   id: string;
   name: string;
   image_url?: string;
-  price?: number;
+  pricePerUnit: number;
   savings?: number | null;
-  manufacturer?: string;
+  manufacturer?: string; // Keep optional
   compliance?: string;
   shipping?: string;
-  packaging?: string;
+  packaging?: string; // Keep optional
   notes?: {
     hospitalUsage?: string;
     stockWarning?: string;
+    recentPurchases?: string;
   };
   url?: string;
   status: {
     isCurrentVendor: boolean;
-  isSelected: boolean;
+    isSelected: boolean;
   };
-  productName?: string;
   delivery?: string;
   qualityRating?: number;
   contactEmail?: string;
   isDefault?: boolean;
+  feedback?: Feedback[];
+  price?: number; // Keep optional for potential legacy use?
 }
 
 interface SelectedVendorAction {
@@ -74,16 +76,16 @@ interface SelectedVendorAction {
 interface OrderDetailsOverlayProps {
   isOpen: boolean;
   onClose: () => void;
-  item: OrderItem;
-  alternativeVendors: any[];
+  item: OrderItem | null; // Allow null
+  alternativeVendors: Vendor[]; // Use Vendor[] type
   setSelectedItems?: React.Dispatch<React.SetStateAction<OrderItem[]>>;
-  handleFindAlternatives?: (itemId: string) => void;
+  handleFindAlternatives?: (item: OrderItem) => void; // Match function signature
   loadingAlternatives?: { [key: string]: boolean };
   renderStars: (rating: number) => React.ReactNode;
   selectedVendors?: { [key: string]: string[] };
   setSelectedVendors?: React.Dispatch<React.SetStateAction<{ [key: string]: string[] }>>;
   setSelectedVendorActions?: React.Dispatch<React.SetStateAction<SelectedVendorAction[]>>;
-  onAddAlternativeVendor: (itemId: string, vendor: Vendor) => void; // Add the new prop
+  onAddAlternativeVendor: (itemId: string, vendor: Vendor) => void;
 }
 
 interface RfqItem {
@@ -122,12 +124,12 @@ interface Swap {
   isDefault?: boolean;
 }
 
-interface BaseItem {
+interface BaseItem { // Re-define BaseItem explicitly for clarity
   id: string;
   name: string;
   quantity: number;
-  unit: string;
-  price: number;
+  unit?: string; // Make optional if not always present
+  price?: number; // Make optional if not always present
   currentVendor?: string;
   unitPrice?: number;
   image?: string;
@@ -136,45 +138,51 @@ interface BaseItem {
   description?: string;
   manufacturer?: string;
   category?: string;
+  packaging?: string;
+  currentStock?: number;
+  totalStock?: number;
+  expiresIn?: string;
+  lastPurchasePrice?: number;
+  requiredUnits?: number;
 }
 
 interface OrderItem extends BaseItem {
   selectedVendor?: Vendor;
-  selectedVendorIds?: string[];
+  selectedVendorIds: string[]; // Make required as it seems intended
   selectedVendors?: Vendor[];
-  vendors: Vendor[];  // Make vendors required
-  vendor?: string;    // Add optional vendor field for backward compatibility
-}
-
-interface InventoryItemWithVendor extends BaseItem {
   vendors: Vendor[];
+  quantity: number; // Ensure quantity is present
 }
 
 const VENDOR_LOGOS = {
   "MedSupply Inc.": "https://medsupplyinc.com/images/medsupply-logo-min.png",
   "Hospital Direct": "https://www.hospitaldirect.co.uk/wp-content/uploads/2022/11/hlogo-300x225.png",
   "McKesson": "https://www.mckesson.com/assets/img/mckesson-logo.svg",
-  "Medline": "https://www.medline.com/wp-content/uploads/2021/03/medline-logo.png",
-  "Cardinal Health": "https://www.cardinalhealth.com/content/dam/corp/web/images/cardinal-health-logo.png",
+  "Medline": "https://upload.wikimedia.org/wikipedia/en/thumb/8/89/Medline-logo.svg/800px-Medline-logo.svg.png",
+  "Medline Industries": "https://upload.wikimedia.org/wikipedia/en/thumb/8/89/Medline-logo.svg/800px-Medline-logo.svg.png",
+  "Cardinal Health": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS23ZIzL4CaSyyP-GT5XpkCDnF5hgfzJP9I6Q&s",
   "Henry Schein": "https://www.henryschein.com/images/hs-logo.svg",
   "Owens & Minor": "https://www.owens-minor.com/wp-content/themes/owens-minor/assets/images/om-logo.svg",
   "Becton Dickinson": "https://www.bd.com/assets/images/bd-logo.svg",
   "PPE Direct": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSTpI8MV2cGuu0DNQGnsswtmsjP7Cxi19uN-Q&s",
-  "3M Healthcare": "https://www.3m.com/3M/en_US/health-care-us/images/3m-healthcare-logo.png",
-  "Abbott Nutrition": "https://www.abbottnutrition.com/images/abbott-nutrition-logo.png",
-  "Bard Medical - A Div of BD": "https://www.bd.com/assets/images/bard-medical-logo.png",
-  "Baxter Healthcare": "https://www.baxter.com/sites/g/files/ebysai746/files/baxter-logo.png",
-  "BD Medical - Div of BD Worldwide": "https://www.bd.com/assets/images/bd-medical-logo.png",
-  "Cardinal Health Inc": "https://www.cardinalhealth.com/content/dam/corp/web/images/cardinal-health-logo.png",
+  "3M Healthcare": "https://upload.wikimedia.org/wikipedia/commons/f/f3/3M_wordmark.svg",
+  "3M Medical": "https://cdn-icons-png.flaticon.com/512/5968/5968227.png",
+  "Abbott Nutrition": "https://www.abbott.com/content/dam/abbott/common/abbott-logo.svg",
+  "Bard Medical": "https://www.bd.com/assets/images/bard-medical-logo.png",
+  "Baxter Healthcare": "https://upload.wikimedia.org/wikipedia/commons/1/13/Baxter_logo.svg",
+  "BD Medical": "https://www.bd.com/assets/images/bd-medical-logo.png",
+  "Cardinal Health Inc": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS23ZIzL4CaSyyP-GT5XpkCDnF5hgfzJP9I6Q&s",
   "Corning Inc": "https://www.corning.com/content/dam/corning/logo.png",
   "Dasco Label": "https://www.dascolabel.com/images/dasco-label-logo.png",
   "International Paper": "https://www.internationalpaper.com/content/dam/internationalpaper/logo.png",
-  "Maquet Inc - Getinge Group": "https://www.getinge.com/dam/corporate/logo.png",
-  "Medline Industries Inc": "https://www.medline.com/wp-content/uploads/2021/03/medline-logo.png",
-  "Philips Healthcare": "https://www.usa.philips.com/healthcare/images/philips-healthcare-logo.png",
-  "Sage Products LLC": "https://sageproducts.com/wp-content/themes/sage-products/images/sage-logo.png",
-  "Westmed - Acq by Sunmed": "https://www.westmedinc.com/images/westmed-logo.png",
-  "Medtronic MITG": "https://www.medtronic.com/content/dam/medtronic-com/global/logos/medtronic-logo.png",
+  "Maquet Inc": "https://www.getinge.com/dam/corporate/logo.png",
+  "Philips Healthcare": "https://www.philips.com/c-dam/corporate/philips-logo.svg",
+  "Sage Products": "https://sageproducts.com/wp-content/themes/sage-products/images/sage-logo.png",
+  "Westmed": "https://www.westmedinc.com/images/westmed-logo.png",
+  "Medtronic": "https://www.medtronic.com/content/dam/medtronic-com/global/logos/medtronic-logo.svg",
+  "B. Braun Medical": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTAfu91Q-iow7TzzN3kWIGi-iL5-PhpR5_IVw&s",
+  "B. Braun": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTAfu91Q-iow7TzzN3kWIGi-iL5-PhpR5_IVw&s",
+  "3D Medical": "https://www.mpo-mag.com/wp-content/uploads/sites/7/2023/07/047_main.jpg",
   "default": "https://res.cloudinary.com/dk2/image/upload/v1/medical-supplies/vendors/default.png"
 };
 
@@ -183,10 +191,18 @@ const getVendorLogo = (vendorName: string): string => {
   const exactMatch = VENDOR_LOGOS[vendorName as keyof typeof VENDOR_LOGOS];
   if (exactMatch) return exactMatch;
 
-  // If no exact match, try to find a partial match
-  const partialMatch = Object.entries(VENDOR_LOGOS).find(([key]) => 
-    vendorName.toLowerCase().includes(key.toLowerCase())
-  );
+  // If no exact match, try to find a partial match by normalizing strings
+  const normalizedVendorName = vendorName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const partialMatch = Object.entries(VENDOR_LOGOS).find(([key]) => {
+    const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+    // Check both directions and handle common abbreviations
+    return normalizedVendorName.includes(normalizedKey) || 
+           normalizedKey.includes(normalizedVendorName) ||
+           // Handle special cases like "3M" vs "3M Healthcare"
+           (normalizedKey.startsWith('3m') && normalizedVendorName.startsWith('3m')) ||
+           // Handle cases where Inc/Corp/Ltd might be omitted
+           normalizedKey.split('inc')[0] === normalizedVendorName.split('inc')[0];
+  });
   
   return partialMatch ? partialMatch[1] : VENDOR_LOGOS.default;
 };
@@ -364,9 +380,9 @@ const OrderDetailsOverlay: React.FC<OrderDetailsOverlayProps> = ({
   const [localItem, setLocalItem] = useState<OrderItem | null>(null);
   const [productFeedback] = useState<{ [key: string]: Feedback[] }>({
     'default-feedback': [
-      { doctorName: "Dr. Smith", rating: 4.5, comment: "Excellent quality, would recommend", date: "2024-03-15" },
-      { doctorName: "Dr. Johnson", rating: 5, comment: "Best in class, very reliable", date: "2024-03-14" },
-      { doctorName: "Dr. Williams", rating: 4, comment: "Good product, slight delay in delivery", date: "2024-03-13" }
+      { hospitalName: "Dr. Smith", rating: 4.5, comment: "Excellent quality, would recommend", date: "2024-03-15" }, // Use hospitalName
+      { hospitalName: "Dr. Johnson", rating: 5, comment: "Best in class, very reliable", date: "2024-03-14" }, // Use hospitalName
+      { hospitalName: "Dr. Williams", rating: 4, comment: "Good product, slight delay in delivery", date: "2024-03-13" } // Use hospitalName
     ]
   });
 
@@ -499,15 +515,15 @@ const OrderDetailsOverlay: React.FC<OrderDetailsOverlayProps> = ({
   if (!isOpen || !localItem) return null;
 
   const baselinePrice = localItem.unitPrice;
-  const alternativePrices = alternativeVendors[localItem.id]?.map((v: any) => v.price) || [];
-  const allPrices = [baselinePrice, ...alternativePrices];
+  const alternativePrices = alternativeVendors.map((v: Vendor) => v.pricePerUnit) || [];
+  const allPrices = [baselinePrice ?? 0, ...alternativePrices];
   const minPrice = Math.min(...allPrices);
   const maxPrice = Math.max(...allPrices);
   const priceRange = maxPrice - minPrice;
   const chartHeight = 120;
 
   // Generate historical data for each vendor
-  const baselineHistory = generateHistoricalData(baselinePrice);
+  const baselineHistory = baselinePrice ? generateHistoricalData(baselinePrice) : [];
   const alternativeHistories = alternativePrices.map((price: number) => generateHistoricalData(price));
 
   return (
@@ -619,7 +635,7 @@ const OrderDetailsOverlay: React.FC<OrderDetailsOverlayProps> = ({
                           <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
                             <div>
                               <div className="text-muted-foreground mb-1">Manufacturer</div>
-                              <div className="font-medium">{localItem.manufacturer || '--'}</div>
+                              <div className="font-medium">{localItem.manufacturer || '--'}</div> {/* Should exist on OrderItem now */}
                             </div>
                             <div>
                               <div className="text-muted-foreground mb-1">Category</div>
@@ -631,27 +647,27 @@ const OrderDetailsOverlay: React.FC<OrderDetailsOverlayProps> = ({
                             </div>
                             <div>
                               <div className="text-muted-foreground mb-1">Packaging</div>
-                              <div className="font-medium">{localItem.packaging || '--'}</div>
+                              <div className="font-medium">{localItem.packaging || '--'}</div> {/* Property should now exist via extension */}
                             </div>
                             <div>
                               <div className="text-muted-foreground mb-1">Current Stock</div>
-                              <div className="font-medium">{localItem.currentStock || 0} / {localItem.totalStock || 0}</div>
+                              <div className="font-medium">{localItem.currentStock ?? 0} / {localItem.totalStock ?? 0}</div> {/* Use ?? and check existence */}
                             </div>
                             <div>
                               <div className="text-muted-foreground mb-1">Expires In</div>
-                              <div className="font-medium">{localItem.expiresIn || '--'}</div>
+                              <div className="font-medium">{localItem.expiresIn || '--'}</div> {/* Property should now exist */}
                             </div>
                             <div>
                               <div className="text-muted-foreground mb-1">Last Purchase Price</div>
-                              <div className="font-medium">${localItem.lastPurchasePrice?.toFixed(2) || '--'}</div>
+                              <div className="font-medium">${localItem.lastPurchasePrice?.toFixed(2) || '--'}</div> {/* Property should now exist */}
                             </div>
                             <div>
                               <div className="text-muted-foreground mb-1">Current Unit Price</div>
-                              <div className="font-medium">${localItem.unitPrice?.toFixed(2) || '--'}</div>
+                              <div className="font-medium">${localItem.unitPrice?.toFixed(2) || '--'}</div> {/* Added optional chaining */}
                             </div>
                             <div>
                               <div className="text-muted-foreground mb-1">Required Units</div>
-                              <div className="font-medium">{localItem.requiredUnits || '--'}</div>
+                              <div className="font-medium">{localItem.requiredUnits || '--'}</div> {/* Property should now exist */}
                             </div>
                           </div>
                         </CardContent>
@@ -694,7 +710,7 @@ const OrderDetailsOverlay: React.FC<OrderDetailsOverlayProps> = ({
                                       </div>
                                       <div className="text-right space-y-1">
                                         <div className="font-medium">{orderItem?.quantity} units</div>
-                                        <div className="text-sm">${orderItem?.price.toFixed(2)} per unit</div>
+                                        <div className="text-sm text-muted-foreground">${orderItem?.price.toFixed(2)} per unit</div>
                                         <Badge 
                                           variant={
                                             order.status === "Completed" ? "default" :
@@ -725,7 +741,7 @@ const OrderDetailsOverlay: React.FC<OrderDetailsOverlayProps> = ({
                             {productFeedback['default-feedback'].map((feedback: Feedback, index: number) => (
                               <div key={index} className="border-b pb-4 last:border-b-0 last:pb-0">
                                 <div className="flex items-center justify-between mb-1">
-                                  <span className="text-sm font-medium">{feedback.doctorName}</span>
+                                  <span className="text-sm font-medium">{feedback.hospitalName}</span>
                                   <div className="flex items-center gap-1">
                                     <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
                                     <span className="text-xs">{feedback.rating}</span>
@@ -758,14 +774,6 @@ const OrderDetailsOverlay: React.FC<OrderDetailsOverlayProps> = ({
                                   : "border-border hover:border-primary"
                               )}
                             >
-                              {isCurrentVendor && (
-                                <Badge 
-                                  variant="secondary" 
-                                  className="absolute -top-2 -right-2 bg-blue-100 text-blue-800"
-                                >
-                                  Current Vendor
-                                </Badge>
-                              )}
                               <div className="flex items-start gap-4">
                                 <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border">
                                   {vendor.image_url ? (
@@ -783,14 +791,27 @@ const OrderDetailsOverlay: React.FC<OrderDetailsOverlayProps> = ({
                                 </div>
                                 <div className="flex-1 space-y-2">
                                   <div className="flex items-center justify-between">
-                                    <div>
-                                      <h4 className="font-medium">{vendor.name}</h4>
-                                      <p className="text-sm text-muted-foreground">{vendor.productName}</p>
+                                    <div className="flex flex-col">
+                                      <div className="flex items-center gap-2">
+                                        <h4 className="font-medium">{vendor.name}</h4>
+                                        {vendor.compliance === "Hospital Approved" && (
+                                          <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                            Hospital Approved
+                                          </Badge>
+                                        )}
+                                        {vendor.status.isCurrentVendor && (
+                                          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                                            Current Vendor
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      {/* Display product name */}
+                                      <p className="text-sm text-muted-foreground">Product: {localItem.name}</p>
                                     </div>
                                     <div className="text-right">
-                                      <div className="font-medium">${vendor.price?.toFixed(2)}</div>
-                                      {vendor.savings !== null && vendor.savings > 0 && (
-                                        <div className="text-sm text-green-600">Save ${vendor.savings.toFixed(2)}</div>
+                                      <div className="font-medium text-lg">${vendor.pricePerUnit?.toFixed(2)}</div>
+                                      {vendor.savings !== null && vendor.savings !== undefined && vendor.savings > 0 && ( // Check undefined as well
+                                        <div className="text-sm text-green-600">Save ${vendor.savings.toFixed(2)}</div> // Savings is checked now
                                       )}
                                     </div>
                                   </div>
@@ -815,20 +836,59 @@ const OrderDetailsOverlay: React.FC<OrderDetailsOverlayProps> = ({
                                         <Clock className="h-4 w-4" />
                                         <span>Shipping: {vendor.shipping}</span>
                                       </div>
-                                      {vendor.notes?.hospitalUsage && (
-                                        <div className="flex items-center gap-1">
-                                          <BookOpen className="h-4 w-4" />
-                                          <span>Usage: {vendor.notes.hospitalUsage}</span>
-                                        </div>
-                                      )}
-                                      {vendor.notes?.stockWarning && (
-                                        <div className="flex items-center gap-1 text-amber-600">
-                                          <AlertTriangle className="h-4 w-4" />
-                                          <span>{vendor.notes.stockWarning}</span>
-                                        </div>
-                                      )}
+                                      <div className="flex items-center gap-1">
+                                        <Box className="h-4 w-4" />
+                                        <span className="font-medium">Packaging: {vendor.packaging}</span>
+                                      </div>
                                     </div>
                                   </div>
+
+                                  {/* Hospital Usage Section */}
+                                  {(vendor.notes?.hospitalUsage || vendor.notes?.recentPurchases) && (
+                                    <div className="mt-3 p-3 bg-blue-50 rounded-lg space-y-2">
+                                      <h5 className="font-medium text-blue-900 flex items-center gap-2">
+                                        <Building2 className="h-4 w-4" />
+                                        Hospital Usage
+                                      </h5>
+                                      {vendor.notes.hospitalUsage && (
+                                        <p className="text-sm text-blue-700">
+                                          <Users className="h-4 w-4 inline mr-2" />
+                                          {vendor.notes.hospitalUsage}
+                                        </p>
+                                      )}
+                                      {vendor.notes.recentPurchases && (
+                                        <p className="text-sm text-blue-700">
+                                          <History className="h-4 w-4 inline mr-2" />
+                                          {vendor.notes.recentPurchases}
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Feedback Section */}
+                                  {vendor.feedback && vendor.feedback.length > 0 && (
+                                    <div className="mt-3 border-t pt-3">
+                                      <h5 className="font-medium mb-2 flex items-center gap-2">
+                                        <MessageSquare className="h-4 w-4" />
+                                        Recent Feedback
+                                      </h5>
+                                      <div className="space-y-2">
+                                        {vendor.feedback.map((feedback, index) => (
+                                          <div key={index} className="bg-muted/50 rounded-lg p-2 text-sm">
+                                            <div className="flex items-center justify-between mb-1">
+                                              <span className="font-medium">{feedback.hospitalName}</span> {/* Changed to hospitalName (matches updated type) */}
+                                              <div className="flex items-center gap-1">
+                                                {renderStars(feedback.rating)}
+                                                <span className="text-xs ml-1">{feedback.rating}</span>
+                                              </div>
+                                            </div>
+                                            <p className="text-muted-foreground">{feedback.comment}</p>
+                                            <span className="text-xs text-muted-foreground">{feedback.date}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
 
                                   <div className="flex items-center gap-2 pt-2">
                                     <Button
@@ -1068,31 +1128,35 @@ export default function CreateOrderPage() {
       // Create vendor objects for all vendors in the array
       const defaultVendor = item.vendors[0]; // Use first vendor as default
       
+      // Ensure the item conforms to OrderItem structure
       const newItem: OrderItem = {
-        ...item,
-        quantity: 1,
-        vendors: item.vendors.map(v => ({
+        ...item, // Spread InventoryItem props
+        quantity: 1, // Add quantity explicitly
+        vendors: item.vendors.map(v => ({ // Map vendors with status
           ...v,
           status: {
-            isCurrentVendor: v === defaultVendor,
-            isSelected: v === defaultVendor
+            isCurrentVendor: v.id === defaultVendor.id, // Compare IDs for reliability
+            isSelected: v.id === defaultVendor.id
           }
         })),
-        selectedVendor: {
+        selectedVendor: { // Set selectedVendor object
           ...defaultVendor,
           status: {
             isCurrentVendor: true,
             isSelected: true
           }
         },
-        selectedVendorIds: [defaultVendor.id],
-        selectedVendors: [{
+        selectedVendorIds: [defaultVendor.id], // Set selectedVendorIds array
+        selectedVendors: [{ // Set selectedVendors array
           ...defaultVendor,
           status: {
             isCurrentVendor: true,
             isSelected: true
           }
         }]
+        // Ensure required BaseItem fields like unit/price are included if needed
+        // unit: item.unit, // Example if unit is required on OrderItem
+        // price: item.price, // Example if price is required on OrderItem
       };
       setSelectedItems((prevItems) => [...prevItems, newItem]);
       setSearchQuery("");
@@ -1283,8 +1347,8 @@ export default function CreateOrderPage() {
                 <span className="font-medium">{vendor.name}</span>
               </div>
               <div className="text-sm text-gray-600">
-                {vendor.price && (
-                  <span className="font-medium">${vendor.price.toFixed(2)}</span>
+                {vendor.pricePerUnit && ( // Use pricePerUnit
+                  <span className="font-medium">${vendor.pricePerUnit.toFixed(2)}</span> // Use pricePerUnit
                 )}
                 {vendor.savings && vendor.savings > 0 && (
                   <span className="ml-2 text-green-600">
@@ -1382,7 +1446,11 @@ export default function CreateOrderPage() {
     }
 
     // Ensure each item has a selected vendor (or handle cases where it might not)
-    const itemsWithVendors = selectedItems.filter(item => item.selectedVendor && item.selectedVendor.price !== undefined && item.selectedVendor.price !== null);
+    const itemsWithVendors = selectedItems.filter(item => 
+        item.selectedVendor && 
+        item.selectedVendor.pricePerUnit !== undefined && 
+        item.selectedVendor.pricePerUnit !== null
+    );
     if (itemsWithVendors.length !== selectedItems.length) {
         console.warn("Some items are missing a selected vendor or vendor price. Cannot proceed.");
         // Show user message explaining which items need attention
@@ -1397,12 +1465,11 @@ export default function CreateOrderPage() {
         name: item.name,
         sku: item.sku,
         quantity: item.quantity,
-        unitPrice: item.selectedVendor.price, // Use the price from the selected vendor
-        vendorId: item.selectedVendor.id || item.selectedVendor.name, // Need a unique ID for the chosen vendor
-        vendorName: item.selectedVendor.name,
+        unitPrice: item.selectedVendor?.pricePerUnit, // Use pricePerUnit
+        vendorId: item.selectedVendor?.id || item.selectedVendor?.name, 
+        vendorName: item.selectedVendor?.name,
       })),
-      totalAmount: calculateTotal(), // Use existing total calculation
-      // Add any other relevant order metadata if needed (e.g., delivery address, user info)
+      totalAmount: calculateTotal(), 
     };
 
     try {
@@ -1428,8 +1495,8 @@ export default function CreateOrderPage() {
     // Ensure every item has a finalized selected vendor before proceeding
     const itemsWithVendors = selectedItems.filter(item => 
         item.selectedVendor && 
-        item.selectedVendor.price !== undefined && 
-        item.selectedVendor.price !== null
+        item.selectedVendor.pricePerUnit !== undefined && 
+        item.selectedVendor.pricePerUnit !== null
     );
     if (itemsWithVendors.length !== selectedItems.length) {
         console.warn("Some items are missing a selected vendor or vendor price.");
@@ -1440,21 +1507,19 @@ export default function CreateOrderPage() {
     // --- Prepare Data for Next Step ---
     const contactMethodData = {
       items: itemsWithVendors.map(item => ({
-        // Map only necessary fields for the next step
         id: item.id,
         name: item.name,
         sku: item.sku,
         quantity: item.quantity,
-        unitPrice: item.selectedVendor.price,
-        image: item.image, // Pass image if available
-        vendor: { // Pass required info about the CHOSEN vendor
-          id: item.selectedVendor.id || item.selectedVendor.name, // Need a unique ID
-          name: item.selectedVendor.name,
-          contactEmail: item.selectedVendor.contactEmail,
-          contactPhone: item.selectedVendor.contactPhone,
+        unitPrice: item.selectedVendor?.pricePerUnit, // Use pricePerUnit
+        image: item.image, 
+        vendor: { 
+          id: item.selectedVendor?.id || item.selectedVendor?.name, 
+          name: item.selectedVendor?.name, 
+          contactEmail: item.selectedVendor?.contactEmail, 
         }
       })),
-      totalAmount: calculateTotal(), // Pass the calculated total
+      totalAmount: calculateTotal(), 
     };
 
     // --- Store Data and Navigate ---
@@ -1487,19 +1552,19 @@ export default function CreateOrderPage() {
 
   const handleImportCSV = () => {
     // Transform inventory data to match the expected format for selected items
-    const importedItems = inventoryData.map(item => {
+    const importedItems: OrderItem[] = inventoryData.map(item => { // Explicitly type mapped array
       const defaultVendor = item.vendors[0];
       return {
-        ...item,
+        ...item, // Spread InventoryItem
         quantity: 1,
-        vendors: item.vendors.map(v => ({
+        vendors: item.vendors.map(v => ({ // Map vendors with status
           ...v,
           status: {
-            isCurrentVendor: v === defaultVendor,
-            isSelected: v === defaultVendor
+            isCurrentVendor: v.id === defaultVendor.id,
+            isSelected: v.id === defaultVendor.id
           }
         })),
-        selectedVendor: {
+        selectedVendor: { // Set selectedVendor object
           ...defaultVendor,
           status: {
             isCurrentVendor: true,
@@ -1507,18 +1572,19 @@ export default function CreateOrderPage() {
           }
         },
         selectedVendorIds: [defaultVendor.id],
-      selectedVendors: [{
+        selectedVendors: [{ // Set selectedVendors array
           ...defaultVendor,
           status: {
             isCurrentVendor: true,
             isSelected: true
           }
         }]
+        // Ensure all required OrderItem fields are present if OrderItem adds more than InventoryItem
       };
     });
     
     setCsvItems(importedItems);
-    setSelectedItems(importedItems);
+    setSelectedItems(importedItems); // Should now accept OrderItem[]
   };
 
   const toggleItemExpansion = (itemId: string) => {
@@ -1546,7 +1612,7 @@ export default function CreateOrderPage() {
     });
 
     // Update global state
-    setSelectedItems(prev => prev.map(item => {
+    setSelectedItems?.(prev => prev.map(item => { // Use optional chaining for setSelectedItems
       if (item.id === itemId) {
         return {
           ...item,
@@ -1598,12 +1664,13 @@ export default function CreateOrderPage() {
       prevItems.map(item => {
         if (item.id === itemId) {
           // Check if vendor already exists
-          const vendorExists = item.selectedVendors.some(v => v.id === vendorToAdd.id || v.name === vendorToAdd.name);
+          const currentSelectedVendors = item.selectedVendors || []; // Default to empty array
+          const vendorExists = currentSelectedVendors.some(v => v.id === vendorToAdd.id || v.name === vendorToAdd.name);
           if (!vendorExists) {
             // Add the new vendor, ensuring isDefault is false
             return {
               ...item,
-              selectedVendors: [...item.selectedVendors, { ...vendorToAdd, isDefault: false, isSelected: false }]
+              selectedVendors: [...currentSelectedVendors, { ...vendorToAdd, isDefault: false, status: { isCurrentVendor: false, isSelected: false} }] 
             };
           }
         }
@@ -1651,7 +1718,9 @@ export default function CreateOrderPage() {
 
   return (
     <>
-      <div className="space-y-6">
+      <div className="flex gap-6">
+        {/* Main Content Area */}
+        <div className="flex-1 space-y-6 min-w-0"> {/* Added min-w-0 to prevent flex child from growing beyond parent */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full">
@@ -1707,8 +1776,11 @@ export default function CreateOrderPage() {
               {/* Search Card */}
               <Card>
                 <CardContent className="space-y-6">
-                  {/* Remove AI Suggestions Section */}
                   <div className="flex gap-2 mt-4">
+                      <Button variant="outline" className="h-12 gap-2">
+                        <BookOpen className="h-4 w-4" />
+                        Catalogue
+                      </Button>
                     <div className="relative flex-1">
                       <Search className="absolute left-4 top-4 h-5 w-5 text-muted-foreground" />
                       <Input
@@ -1718,62 +1790,9 @@ export default function CreateOrderPage() {
                         onChange={(e) => setSearchQuery(e.target.value)}
                       />
                     </div>
-                    <div className="flex gap-2">
-                      <div className="relative" ref={filtersRef}>
-                        <Button variant="outline" className="gap-2" onClick={() => setShowFilters(!showFilters)}>
-                          <Filter className="h-4 w-4" />
-                        </Button>
-                        {showFilters && (
-                          <div className="absolute right-0 mt-2 w-[280px] rounded-lg border bg-white shadow-lg z-50 p-4 space-y-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="filterPaymentTerms">Payment Terms</Label>
-                              <select
-                                id="filterPaymentTerms"
-                                value={selectedPaymentTerms}
-                                onChange={(e) => setSelectedPaymentTerms(e.target.value)}
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                              >
-                                {paymentTermsOptions.map((term) => (
-                                  <option key={term} value={term}>
-                                    {term}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="filterDeliveryTime">Delivery Time</Label>
-                              <select
-                                id="filterDeliveryTime"
-                                value={selectedDeliveryTime}
-                                onChange={(e) => setSelectedDeliveryTime(e.target.value)}
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                              >
-                                {deliveryTimeOptions.map((time) => (
-                                  <option key={time} value={time}>
-                                    {time}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" className="gap-2">
-                            <ArrowUpDown className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56">
-                          <DropdownMenuRadioGroup value={groupBy} onValueChange={setGroupBy}>
-                            <DropdownMenuRadioItem value="none">None</DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="vendor">Vendor</DropdownMenuRadioItem>
-                          </DropdownMenuRadioGroup>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
                   </div>
 
+                    {/* Search Results */}
                   {searchQuery && (
                     <div className="border rounded-md">
                       {isSearching ? (
@@ -1810,14 +1829,14 @@ export default function CreateOrderPage() {
 
                               {/* Stock */}
                               <div className="text-sm text-center">
-                                <div className="font-medium">{item.currentStock}/{item.totalStock}</div>
+                                <div className="font-medium">{item.currentStock ?? 0}/{item.totalStock ?? 0}</div> {/* Use ?? */}
                                 <div className="text-muted-foreground">in stock</div>
                               </div>
 
                               {/* Supplier & Price */}
                               <div className="text-right min-w-[150px]">
-                                <div className="font-medium">{item.vendor}</div>
-                                <div className="text-sm text-muted-foreground">${item.unitPrice.toFixed(2)} per unit</div>
+                                <div className="font-medium">{item.vendors[0]?.name || 'N/A'}</div> {/* Use first vendor name */}
+                                <div className="text-sm text-muted-foreground">${item.unitPrice?.toFixed(2) ?? 'N/A'} per unit</div> {/* Use optional chaining */}
                               </div>
 
                               {/* Add Button */}
@@ -1838,17 +1857,58 @@ export default function CreateOrderPage() {
                       )}
                     </div>
                   )}
+                  </CardContent>
+                </Card>
 
                   {/* Selected Items Table */}
                   {selectedItems.length > 0 && (
-                    <div className="overflow-x-auto">
-                      <div className="min-w-[1400px]">
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle>Selected Items</CardTitle>
+                          <CardDescription>Items added to your order</CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm" className="gap-2">
+                                <Filter className="h-4 w-4" />
+                                Filter
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {/* Add filter options here */}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm" className="gap-2">
+                                <ArrowUpDown className="h-4 w-4" />
+                                Group by
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuRadioGroup value={groupBy} onValueChange={setGroupBy}>
+                                <DropdownMenuRadioItem value="none">None</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="vendor">Vendor</DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="category">Category</DropdownMenuRadioItem>
+                              </DropdownMenuRadioGroup>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="relative w-full overflow-auto">
+                        <div className="w-[1400px] min-w-full">
+                          <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-white via-white/80 to-transparent pointer-events-none z-10"></div> {/* Increased width from w-8 to w-16 and enhanced gradient */}
                         <Table>
                           <TableHeader>
                             <TableRow>
                               <TableHead className="w-[400px]">Product Details</TableHead>
                               <TableHead className="w-[140px]">SKU</TableHead>
-                              <TableHead className="w-[250px]">Vendor</TableHead>
+                                <TableHead className="w-[200px]">Vendor</TableHead> {/* Reduced from 250px */}
                               <TableHead className="w-[120px] text-center">Review</TableHead>
                               <TableHead className="w-[120px] text-right">Unit Price</TableHead>
                               <TableHead className="w-[100px] text-center">Quantity</TableHead>
@@ -1994,7 +2054,7 @@ export default function CreateOrderPage() {
                                             </div>
                                           </TableCell>
                                           <TableCell className="text-right">
-                                            ${item.unitPrice.toFixed(2)}
+                                            ${item.unitPrice?.toFixed(2) ?? '0.00'} {/* Use optional chaining */}
                                           </TableCell>
                                           <TableCell>
                                             <Input
@@ -2010,7 +2070,7 @@ export default function CreateOrderPage() {
                                             />
                                           </TableCell>
                                           <TableCell className="text-right">
-                                            ${((item.quantity || 1) * item.unitPrice).toFixed(2)}
+                                            ${((item.quantity || 1) * (item.unitPrice ?? 0)).toFixed(2)} {/* Handle undefined unitPrice */}
                                           </TableCell>
                                           <TableCell>{selectedPaymentTerms}</TableCell>
                                           <TableCell>{selectedDeliveryTime}</TableCell>
@@ -2142,7 +2202,7 @@ export default function CreateOrderPage() {
                                       </div>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                      ${item.unitPrice.toFixed(2)}
+                                      ${item.unitPrice?.toFixed(2) ?? '0.00'} {/* Use optional chaining */}
                                     </TableCell>
                                     <TableCell>
                                       <Input
@@ -2158,7 +2218,7 @@ export default function CreateOrderPage() {
                                       />
                                     </TableCell>
                                     <TableCell className="text-right">
-                                      ${((item.quantity || 1) * item.unitPrice).toFixed(2)}
+                                      ${((item.quantity || 1) * (item.unitPrice ?? 0)).toFixed(2)} {/* Handle undefined unitPrice */}
                                     </TableCell>
                                     <TableCell>{selectedPaymentTerms}</TableCell>
                                     <TableCell>{selectedDeliveryTime}</TableCell>
@@ -2192,180 +2252,215 @@ export default function CreateOrderPage() {
                         </Table>
                       </div>
                     </div>
-                  )}
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
 
-                  {/* Separate Summary Section */}
-                  {selectedItems.length > 0 && (
-                    <div className="mt-6">
-                      <div className="grid gap-6 md:grid-cols-2">
-                        {/* Summary Statistics Card */}
+            {activeTab === "quotes" && (
             <Card>
               <CardHeader>
-                            <CardTitle>Order Summary</CardTitle>
-                            <CardDescription>Review your order details</CardDescription>
+                  <CardTitle>Quotes</CardTitle>
+                  <CardDescription>View and compare quotes from different vendors</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="border rounded-lg p-3">
-                                <div className="text-sm text-muted-foreground">Total Items</div>
-                                <div className="text-2xl font-semibold">{selectedItems.length}</div>
+                <CardContent>
+                  <div className="text-center text-muted-foreground py-8">
+                    No quotes available yet. Add items to your order to get quotes.
                               </div>
-                              <div className="border rounded-lg p-3">
-                                <div className="text-sm text-muted-foreground">Total Vendors</div>
-                                <div className="text-2xl font-semibold">
-                                  {new Set(selectedItems.flatMap(item => 
-                                    item.vendors.filter(v => v.status.isSelected).map(v => v.name)
-                                  )).size}
-                                </div>
-                              </div>
-                              <div className="border rounded-lg p-3">
-                                <div className="text-sm text-muted-foreground">Total Quantity</div>
-                                <div className="text-2xl font-semibold">
-                                  {selectedItems.reduce((sum, item) => sum + (item.quantity || 0), 0)}
-                                </div>
-                              </div>
-                              <div className="border rounded-lg p-3">
-                                <div className="text-sm text-muted-foreground">Total Amount</div>
-                                <div className="text-2xl font-semibold">${calculateTotal().toFixed(2)}</div>
-                              </div>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="space-y-2 pt-4 border-t">
-                              <Button
-                                className="w-full justify-start gap-2" 
-                                onClick={handleGenerateRFQ}
-                              >
-                                <FileText className="h-4 w-4" />
-                                Create an RFQ
-                              </Button>
-                              <Button 
-                                className="w-full justify-start gap-2" 
-                                variant="outline"
-                                onClick={handleProceedToOrderConfirmation}
-                              >
-                                <ShoppingCart className="h-4 w-4" />
-                                Buy with AMS
-                              </Button>
-                              <Button
-                                className="w-full justify-start gap-2" 
-                                variant="outline"
-                                onClick={() => {/* TODO: Implement email functionality */}}
-                              >
-                                <Mail className="h-4 w-4" />
-                                Send Email
-                              </Button>
-                              <Button 
-                                className="w-full justify-start gap-2" 
-                                variant="outline"
-                                onClick={() => {/* TODO: Implement AI call functionality */}}
-                              >
-                                <PhoneCall className="h-4 w-4" />
-                                AI Call
-                              </Button>
-                            </div>
-              </CardContent>
-            </Card>
-
-                        {/* Actions and AI Analytics Card */}
-                        <Card>
-                          <CardHeader>
-                            <CardTitle>Actions & AI Insights</CardTitle>
-                            <CardDescription>Take action and view AI-powered recommendations</CardDescription>
-                          </CardHeader>
-                          <CardContent className="space-y-4">
-                            <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
-                              <div className="flex items-center gap-3 mb-4">
-                                <div className="p-1.5 bg-blue-100 rounded-full">
-                                  <Sparkles className="h-4 w-4 text-blue-600" />
-                                </div>
-                                <div className="text-sm text-blue-800">
-                                  We've found 2 items you might want to add based on your recent activity.
-                                </div>
-                              </div>
-
-                              <div className="space-y-3">
-                                <div className="flex items-start justify-between p-3 bg-white rounded-lg border border-blue-200">
-                                  <div>
-                                    <div className="font-medium text-blue-900">Cost Optimization</div>
-                                    <p className="text-sm text-blue-700 mt-1">
-                                      Potential savings of up to 15% by consolidating orders with AMS
-                                    </p>
-                                  </div>
-                                  <Button size="sm" variant="outline" className="text-blue-600 border-blue-200">
-                                    View
-                                  </Button>
-                                </div>
-
-                                <div className="flex items-start justify-between p-3 bg-white rounded-lg border border-blue-200">
-                                  <div>
-                                    <div className="font-medium text-blue-900">Compliance Check</div>
-                                    <p className="text-sm text-blue-700 mt-1">
-                                      All selected items meet regulatory requirements
-                                    </p>
-                                  </div>
-                                  <Button size="sm" variant="outline" className="text-blue-600 border-blue-200">
-                                    View
-                                  </Button>
-                                </div>
-
-                                <div className="flex items-start justify-between p-3 bg-white rounded-lg border border-blue-200">
-                                  <div>
-                                    <div className="font-medium text-blue-900">Similar Items</div>
-                                    <p className="text-sm text-blue-700 mt-1">
-                                      2 recommended items based on your order history
-                                    </p>
-                                  </div>
-                                  <Button size="sm" variant="outline" className="text-blue-600 border-blue-200">
-                                    Add
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-              </div>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
-            </>
-          )}
+            )}
+          </div>
+        </div>
 
-          {activeTab === "quotes" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Quotes</CardTitle>
-                <CardDescription>View and compare quotes from different vendors</CardDescription>
+        {/* Right Sidebar */}
+        <div className="w-[360px] space-y-4 pt-[120px]"> {/* Increased from pt-[88px] to pt-[120px] */}
+          {/* Order Summary Card - Only show when there are selected items */}
+          {selectedItems.length > 0 && (
+            <Card className="overflow-hidden">
+              <CardHeader className="border-b bg-muted/30 py-3">
+                <div className="flex items-center gap-2">
+                  <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-base">Order Summary</CardTitle>
+                </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-center text-muted-foreground py-8">
-                  No quotes available yet. Add items to your order to get quotes.
+              <CardContent className="p-0">
+                {/* Summary Section */}
+                <div className="px-4 py-3 border-b">
+                  <h3 className="text-sm font-medium mb-2">Summary</h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Items</span>
+                      <span className="font-medium">{selectedItems.length}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Total Units</span>
+                      <span className="font-medium">
+                        {selectedItems.reduce((sum, item) => sum + (item.quantity || 0), 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Amount</span>
+                      <span className="font-semibold text-primary">${calculateTotal().toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Budget Section - Redesigned */}
+                <div className="px-4 py-3 border-b">
+                  <h3 className="text-sm font-medium mb-2">Budget</h3>
+                  
+                  {/* Overall Budget */}
+                  <div className="mb-3">
+                    <div className="flex justify-between items-baseline text-sm mb-1.5">
+                      <span className="text-muted-foreground">Overall</span>
+                      <span className="font-medium">75%</span>
+                    </div>
+                    <div className="w-full h-[6px] bg-muted/40 rounded-full">
+                      <div className="h-full rounded-full bg-blue-500" style={{ width: '75%' }}></div>
+                    </div>
+                  </div>
+                  
+                  {/* Gloves Budget */}
+                  <div className="mb-3">
+                    <div className="flex justify-between items-baseline text-sm mb-1.5">
+                      <span className="text-muted-foreground">Gloves</span>
+                      <span className="font-medium">45%</span>
+                    </div>
+                    <div className="w-full h-[6px] bg-muted/40 rounded-full">
+                      <div className="h-full rounded-full bg-green-500" style={{ width: '45%' }}></div>
+                    </div>
+                  </div>
+                  
+                  {/* Department Budget */}
+                  <div>
+                    <div className="flex justify-between items-baseline text-sm mb-1.5">
+                      <span className="text-muted-foreground">Surgery Dept</span>
+                      <span className="font-medium">92%</span>
+                    </div>
+                    <div className="w-full h-[6px] bg-muted/40 rounded-full">
+                      <div className="h-full rounded-full bg-amber-500" style={{ width: '92%' }}></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* AI Insights Section - Single notification style */}
+                <div className="px-4 py-3 border-b">
+                  <h3 className="text-sm font-medium mb-2">AI Insights</h3>
+                  <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                    <div className="flex items-start gap-2">
+                      <Sparkles className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm text-blue-700 mb-2">3 items in this order are nearing budget limit for Surgery Department.</p>
+                        <Button size="sm" variant="outline" className="h-7 w-full text-xs text-center justify-center bg-white text-blue-700 border-blue-200 hover:bg-blue-50">
+                          Review Items
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons - Vertical placement with consistent styling */}
+                <div className="p-4 space-y-2">
+                  <Button
+                    className="w-full justify-center items-center gap-2"
+                    onClick={handleGenerateRFQ}
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span>Create an RFQ</span>
+                  </Button>
+                  <Button
+                    className="w-full justify-center items-center gap-2"
+                    variant="outline"
+                    onClick={handleProceedToOrderConfirmation}
+                  >
+                    <ShoppingCart className="h-4 w-4" />
+                    <span>Buy with AMS</span>
+                  </Button>
+                  <Button
+                    className="w-full justify-center items-center gap-2"
+                    variant="outline"
+                    size="sm"
+                  >
+                    <Mail className="h-4 w-4" />
+                    <span>Email Order</span>
+                  </Button>
+                  <Button
+                    className="w-full justify-center items-center gap-2"
+                    variant="outline"
+                    size="sm"
+                  >
+                    <PhoneCall className="h-4 w-4" />
+                    <span>AI Call</span>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           )}
-        </div>
-      </div> {/* Close main space-y-6 div */}
 
-      {/* Quick Actions Toolbar - Will show 'Review Order' or 'Create RFQ' button */}
+          {/* Empty state message when no items are selected */}
+          {selectedItems.length === 0 && (
+            <Card className="overflow-hidden">
+              <CardHeader className="border-b bg-muted/30 py-3">
+                <div className="flex items-center gap-2">
+                  <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-base">Order Summary</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {/* Summary Section with zeros */}
+                <div className="px-4 py-3 border-b">
+                  <h3 className="text-sm font-medium mb-2">Summary</h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Items</span>
+                      <span className="font-medium">0</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Total Units</span>
+                      <span className="font-medium">0</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Amount</span>
+                      <span className="font-semibold text-primary">$0.00</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Simple message */}
+                <div className="p-4 text-center text-sm text-muted-foreground">
+                  Add items to see full order details
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* AI Insights Card - Removed and integrated into summary card */}
+          
+        </div>
+      </div>
+
+      {/* Quick Actions Toolbar */}
       <QuickActionsToolbar />
       
+      {/* Overlays */}
       <OrderDetailsOverlay
         isOpen={isDetailsOverlayOpen}
         onClose={() => setIsDetailsOverlayOpen(false)}
-        item={selectedItem}
-        alternativeVendors={alternativeVendors[selectedItem?.id] || []}
+        item={selectedItem} // Pass selectedItem (can be null)
+        alternativeVendors={selectedItem ? alternativeVendors[selectedItem.id] || [] : []} // Handle null selectedItem
         setSelectedItems={setSelectedItems}
-        handleFindAlternatives={handleFindAlternatives}
+        handleFindAlternatives={() => selectedItem && handleFindAlternatives(selectedItem)} // Wrap call
         loadingAlternatives={loadingAlternatives}
         renderStars={renderStars}
         selectedVendors={selectedVendors}
-        setSelectedVendors={setSelectedVendors}
-        setSelectedVendorActions={setSelectedVendorActions}
+        setSelectedVendors={setSelectedVendors} // Pass state setter
+        setSelectedVendorActions={setSelectedVendorActions} // Pass state setter
         onAddAlternativeVendor={handleAddAlternativeVendor}
       />
 
+      {/* AI Suggestions Overlay */}
       {isAISuggestionsOverlayOpen && (
         <AnimatePresence>
           <>
@@ -2476,143 +2571,6 @@ export default function CreateOrderPage() {
           </>
         </AnimatePresence>
       )}
-
-      {/* RFQ Confirmation Dialog */}
-      <AnimatePresence>
-        {showRfqDialog && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 z-[100]"
-              onClick={() => !isGeneratingRfq && setShowRfqDialog(false)}
-            />
-            
-            {/* Dialog */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
-              className="fixed left-[40%] top-[50px] translate-x-[-50%] translate-y-0 w-full max-w-2xl bg-white shadow-lg rounded-lg z-[101] overflow-y-auto max-h-[calc(100vh-100px)]"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold">Generate Request for Quotation</h3>
-                    <p className="text-sm text-muted-foreground">Review the details before proceeding</p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full"
-                    onClick={() => !isGeneratingRfq && setShowRfqDialog(false)}
-                    disabled={isGeneratingRfq}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <div className="space-y-6">
-                  {/* Order Summary */}
-                  <div className="space-y-2">
-                    <h4 className="font-medium">Order Summary</h4>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div className="space-y-1">
-                        <div className="text-muted-foreground">Total Items</div>
-                        <div className="font-medium">{selectedItems.length} items</div>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-muted-foreground">Total Amount</div>
-                        <div className="font-medium">${calculateTotal().toFixed(2)}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Selected Vendors */}
-                  <div className="space-y-2">
-                    <h4 className="font-medium">Selected Vendors</h4>
-                    <div className="border rounded-lg divide-y">
-                      {Array.from(new Set(selectedItems.flatMap(item => 
-                        item.vendors
-                          .filter(v => v.status.isSelected)
-                          .map(v => ({
-                            name: v.name,
-                            items: selectedItems.filter(i => 
-                              i.vendors.some(vendor => 
-                                vendor.status.isSelected && vendor.name === v.name
-                              )
-                            ).length
-                          }))
-                      ))).map((vendor, index) => (
-                        <div key={index} className="p-3 flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                              <img
-                                src={getVendorLogo(vendor.name)}
-                                alt={vendor.name}
-                                className="w-full h-full object-contain p-1"
-                              />
-                            </div>
-                            <div>
-                              <div className="font-medium">{vendor.name}</div>
-                              <div className="text-sm text-muted-foreground">{vendor.items} items</div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Terms & Conditions */}
-                  <div className="space-y-2">
-                    <h4 className="font-medium">Terms & Conditions</h4>
-                    <div className="text-sm space-y-2 text-muted-foreground">
-                      <p>By proceeding, you agree to:</p>
-                      <ul className="list-disc pl-5 space-y-1">
-                        <li>Share item specifications with selected vendors</li>
-                        <li>Allow vendors to submit quotes within 5 business days</li>
-                        <li>Maintain quote confidentiality</li>
-                        <li>Review and respond to quotes in a timely manner</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-4 border-t">
-                  <Button
-                    variant="outline"
-                    onClick={() => !isGeneratingRfq && setShowRfqDialog(false)}
-                    disabled={isGeneratingRfq}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleConfirmRFQ}
-                    disabled={isGeneratingRfq}
-                    className="gap-2"
-                  >
-                    {isGeneratingRfq ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="h-4 w-4" />
-                        Generate RFQ
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
     </>
   )
 }
